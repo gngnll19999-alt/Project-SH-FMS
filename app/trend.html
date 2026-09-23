@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>트렌드 · 히스토리안 · SH-FMS</title>
+<link rel="stylesheet" href="../assets/css/app.css">
+<style>
+  .taglist { max-height: 420px; overflow-y: auto; }
+  .taglist label {
+    display: flex; align-items: center; gap: 8px; padding: 6px 10px;
+    border-bottom: 1px solid #1c232c; font-size: 11.5px; cursor: pointer;
+  }
+  .taglist label:hover { background: #1a2029; }
+  .taglist input { accent-color: #35c0d6; }
+  .taglist .tg { font-family: var(--mono); color: #8fc5d0; width: 106px; flex: 0 0 auto; }
+  .taglist .ds { flex: 1; color: var(--txt-2); }
+  .taglist .sw { width: 9px; height: 9px; border-radius: 2px; flex: 0 0 auto; }
+</style>
+</head>
+<body data-page="trend" data-title="트렌드 · 히스토리안" data-crumb="시계열 조회" data-lvl="ISA-101 LEVEL 4">
+
+<div class="filters">
+  <label>기간</label>
+  <select id="f-range">
+    <option value="60">최근 1시간</option>
+    <option value="120" selected>최근 2시간</option>
+    <option value="480">최근 8시간</option>
+    <option value="1440">최근 24시간</option>
+  </select>
+  <label>샘플링</label>
+  <select><option>원본 (1초)</option><option>1분 평균</option><option>5분 평균</option></select>
+  <button class="btn pri" id="f-go">조회</button>
+  <div style="flex:1"></div>
+  <button class="btn" id="btn-csv">CSV 내보내기</button>
+  <button class="btn" onclick="alert('트렌드 그룹 저장\n\n현재 선택한 태그 조합을 이름 붙여 저장합니다.\n관제실에서 자주 보는 조합은 그룹으로 등록해 두면 한 번에 불러올 수 있습니다.')">그룹 저장</button>
+  <span class="dim" style="font-size:11px">히스토리안 보존: 원본 90일 / 1분 평균 3년</span>
+</div>
+
+<div class="grid" style="grid-template-columns:1fr 320px;align-items:start">
+  <div>
+    <div class="card" style="margin-bottom:10px">
+      <header>
+        <h2>트렌드</h2><span class="sub" id="tr-sub"></span>
+        <div class="spacer"></div>
+        <div class="legend" id="lg"></div>
+      </header>
+      <div class="body"><div id="ch"></div>
+        <div class="note">서로 다른 단위의 태그를 함께 볼 때는 각 태그의 운전범위(L~H)를 0~100%로 정규화해 표시합니다. 절대값은 아래 통계표에서 확인하세요.</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <header><h2>통계</h2><span class="sub">조회 구간 기준</span></header>
+      <div class="body tight">
+        <table class="tb">
+          <thead><tr>
+            <th style="width:110px">태그</th><th>설명</th>
+            <th class="num" style="width:80px">현재</th><th class="num" style="width:80px">최소</th>
+            <th class="num" style="width:80px">최대</th><th class="num" style="width:80px">평균</th>
+            <th class="num" style="width:80px">표준편차</th>
+            <th class="num" style="width:90px">범위이탈</th><th style="width:60px">단위</th>
+          </tr></thead>
+          <tbody id="st-tb"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div>
+    <div class="card" style="margin-bottom:10px">
+      <header><h2>태그 선택</h2><span class="sub" id="sel-cnt"></span>
+        <div class="spacer"></div>
+        <button class="btn sm" id="btn-clear">해제</button>
+      </header>
+      <div class="body tight taglist" id="taglist"></div>
+    </div>
+
+    <div class="card">
+      <header><h2>저장된 트렌드 그룹</h2></header>
+      <div class="body tight">
+        <table class="tb"><tbody id="grp-tb"></tbody></table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="../assets/js/auth.js"></script>
+<script src="../assets/js/mock.js"></script>
+<script src="../assets/js/chart.js"></script>
+<script src="../assets/js/shell.js"></script>
+<script>
+(function () {
+  // 저채도 팔레트. 트렌드에서 색은 '구분'을 위한 것이지 '강조'가 아니다.
+  var COLORS = ['#8fa8c0', '#5f8a76', '#8a7a4a', '#7f93ab', '#9a8196', '#6e8a99'];
+  var sel = ['CT01_TT301', 'CT01_TH303'];
+
+  function drawList() {
+    document.getElementById('taglist').innerHTML = Mock.TAGS.map(function (t) {
+      var i = sel.indexOf(t.tag);
+      return '<label><input type="checkbox" data-tag="' + t.tag + '"' + (i > -1 ? ' checked' : '') + '>' +
+        '<span class="sw" style="background:' + (i > -1 ? COLORS[i % COLORS.length] : '#2a323d') + '"></span>' +
+        '<span class="tg">' + t.tag + '</span><span class="ds">' + t.desc + '</span></label>';
+    }).join('');
+    Array.prototype.forEach.call(document.querySelectorAll('#taglist input'), function (inp) {
+      inp.onchange = function () {
+        var tg = inp.dataset.tag;
+        var i = sel.indexOf(tg);
+        if (inp.checked) {
+          if (sel.length >= 6) { alert('한 번에 최대 6개 태그까지 표시할 수 있습니다.'); inp.checked = false; return; }
+          sel.push(tg);
+        } else if (i > -1) sel.splice(i, 1);
+        drawList(); draw();
+      };
+    });
+    document.getElementById('sel-cnt').textContent = sel.length + ' / 6 선택';
+  }
+
+  function draw() {
+    var mins = +document.getElementById('f-range').value;
+    var pts = Math.min(180, Math.max(40, Math.round(mins / 2)));
+    document.getElementById('tr-sub').textContent =
+      '최근 ' + (mins >= 60 ? (mins / 60) + '시간' : mins + '분') + ' · ' + sel.length + '개 태그';
+
+    if (!sel.length) {
+      document.getElementById('ch').innerHTML = '<div class="empty">표시할 태그를 선택하세요.</div>';
+      document.getElementById('st-tb').innerHTML = '';
+      document.getElementById('lg').innerHTML = '';
+      return;
+    }
+
+    var series = [], stats = [];
+    sel.forEach(function (tg, i) {
+      var h = Mock.history(tg, pts);
+      var t = h.tag;
+      // 단위가 다르므로 운전범위 기준 0~100% 정규화
+      var span = (t.hiHi - t.loLo) || 1;
+      var norm = h.data.map(function (v) { return +((v - t.loLo) / span * 100).toFixed(2); });
+      series.push({ name: tg, color: COLORS[i % COLORS.length], data: norm });
+
+      var mn = Math.min.apply(null, h.data), mx = Math.max.apply(null, h.data);
+      var avg = h.data.reduce(function (a, b) { return a + b; }, 0) / h.data.length;
+      var sd = Math.sqrt(h.data.reduce(function (a, b) { return a + Math.pow(b - avg, 2); }, 0) / h.data.length);
+      var out = h.data.filter(function (v) { return v > t.hi || v < t.lo; }).length;
+      stats.push({ t: t, cur: h.data[h.data.length - 1], mn: mn, mx: mx, avg: avg, sd: sd, out: out, n: h.data.length, labels: h.labels });
+    });
+
+    Chart.line(document.getElementById('ch'), {
+      labels: stats[0].labels, h: 300, min: 0, max: 100,
+      series: series,
+      refs: [{ v: 50, color: '#2a323d', label: '' }]
+    });
+
+    document.getElementById('lg').innerHTML = sel.map(function (tg, i) {
+      return '<span><i style="background:' + COLORS[i % COLORS.length] + '"></i>' + tg + '</span>';
+    }).join('');
+
+    document.getElementById('st-tb').innerHTML = stats.map(function (s, i) {
+      var dec = s.t.unit === 'mm' ? 4 : s.t.unit === 'bar' ? 3 : 2;
+      return '<tr><td><span class="sw" style="display:inline-block;width:9px;height:9px;border-radius:2px;background:' +
+        COLORS[i % COLORS.length] + ';margin-right:6px"></span><span class="tag">' + s.t.tag + '</span></td>' +
+        '<td>' + s.t.desc + '</td>' +
+        '<td class="num" style="font-weight:600">' + s.cur.toFixed(dec) + '</td>' +
+        '<td class="num dim">' + s.mn.toFixed(dec) + '</td>' +
+        '<td class="num dim">' + s.mx.toFixed(dec) + '</td>' +
+        '<td class="num">' + s.avg.toFixed(dec) + '</td>' +
+        '<td class="num dim">' + s.sd.toFixed(dec) + '</td>' +
+        '<td class="num" style="color:' + (s.out ? 'var(--warn)' : 'var(--dim)') + '">' +
+          s.out + ' / ' + s.n + '</td>' +
+        '<td class="dim">' + s.t.unit + '</td></tr>';
+    }).join('');
+  }
+
+  document.getElementById('f-go').onclick = draw;
+  document.getElementById('f-range').onchange = draw;
+  document.getElementById('btn-clear').onclick = function () { sel = []; drawList(); draw(); };
+  document.getElementById('btn-csv').onclick = function () {
+    if (!sel.length) { alert('내보낼 태그를 선택하세요.'); return; }
+    alert('CSV 내보내기\n\n태그 : ' + sel.join(', ') +
+      '\n기간 : 최근 ' + document.getElementById('f-range').value + '분' +
+      '\n형식 : timestamp, tag, value, quality\n\n히스토리안 읽기전용 API 로 조회합니다. (SCADA 서버 직접 접근 불가)');
+  };
+
+  var GRP = [
+    { n: '코팅 1라인 핵심', t: 'CT01_TT301, CT01_SP302, CT01_TH303', by: '김현우' },
+    { n: '배합 반응 조건', t: 'MIX02_TT201, MIX02_PT202, MIX02_ST203', by: '강도현' },
+    { n: '유틸리티 공급', t: 'UTL_AIR701, UTL_CHW702, UTL_STM703', by: '김현우' },
+    { n: '환경 감시', t: 'ENV_VOC801, ENV_O2802', by: '조현탁' }
+  ];
+  document.getElementById('grp-tb').innerHTML = GRP.map(function (g, i) {
+    return '<tr style="cursor:pointer" data-g="' + i + '"><td style="width:118px"><b>' + g.n + '</b>' +
+      '<div class="dim" style="font-size:10px">' + g.by + '</div></td>' +
+      '<td class="dim" style="white-space:normal;font-size:10.5px">' + g.t + '</td></tr>';
+  }).join('');
+  Array.prototype.forEach.call(document.querySelectorAll('#grp-tb tr'), function (tr) {
+    tr.onclick = function () {
+      sel = GRP[tr.dataset.g].t.split(',').map(function (s) { return s.trim(); });
+      drawList(); draw();
+    };
+  });
+
+  drawList();
+  draw();
+})();
+</script>
+</body>
+</html>

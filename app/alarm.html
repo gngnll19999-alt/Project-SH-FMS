@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>알람 관리 · SH-FMS</title>
+<link rel="stylesheet" href="../assets/css/app.css">
+</head>
+<body data-page="alarm" data-title="알람 관리" data-crumb="ISA-18.2" data-lvl="ISA-101 LEVEL 4">
+
+<div class="grid g5" style="margin-bottom:10px" id="kpi"></div>
+
+<div class="filters">
+  <label>우선순위</label>
+  <select id="f-pri"><option value="">전체</option><option value="1">P1 (긴급)</option><option value="2">P2 (높음)</option><option value="3">P3 (낮음)</option></select>
+  <label>구역</label>
+  <select id="f-area"><option value="">전체</option><option>A동</option><option>B동</option><option>C동</option><option>D동</option><option>유틸</option></select>
+  <label>상태</label>
+  <select id="f-st"><option value="">전체</option><option value="un">미확인</option><option value="ack">확인됨</option><option value="sh">셸빙</option></select>
+  <button class="btn pri" id="f-go">조회</button>
+  <div style="flex:1"></div>
+  <button class="btn" id="btn-ack">선택 확인(ACK)</button>
+  <button class="btn" id="btn-shelf">선택 셸빙</button>
+  <button class="btn" onclick="alert('알람 철학(Alarm Philosophy) 문서\n\n· 우선순위 정의 (P1/P2/P3)\n· 셸빙 규칙 및 자동 복귀 시간\n· 운전원 대응시간 기준\n· 감사 주기 및 KPI 정의\n\n문서번호 SH-FMS-AP-2026-001')">알람 철학 문서</button>
+</div>
+
+<div class="card" style="margin-bottom:10px">
+  <header>
+    <h2>알람 목록</h2><span class="sub" id="cnt"></span>
+    <div class="spacer"></div>
+    <div class="legend">
+      <span><i style="background:#d6483c"></i>P1 긴급</span>
+      <span><i style="background:#d6a02c"></i>P2 높음</span>
+      <span><i style="background:#4a86d8"></i>P3 낮음</span>
+    </div>
+  </header>
+  <div class="body tight">
+    <table class="tb">
+      <thead><tr>
+        <th style="width:26px"><input type="checkbox" id="ck-all"></th>
+        <th style="width:36px">등급</th>
+        <th style="width:118px">알람 ID</th>
+        <th style="width:66px">발생시각</th>
+        <th style="width:110px">태그</th>
+        <th style="width:52px">구역</th>
+        <th style="width:52px">유형</th>
+        <th>메시지</th>
+        <th style="width:66px">경과</th>
+        <th style="width:110px">상태</th>
+        <th style="width:112px">조치</th>
+      </tr></thead>
+      <tbody id="tb"></tbody>
+    </table>
+  </div>
+</div>
+
+<div class="grid" style="grid-template-columns:1fr 1fr">
+  <div class="card">
+    <header>
+      <h2>알람 부하 (ISA-18.2 KPI)</h2><span class="sub">시간대별 발생 건수 · 금일</span>
+      <div class="spacer"></div>
+      <span class="dim" style="font-size:10.5px">목표: 시간당 6건 이하</span>
+    </header>
+    <div class="body"><div id="ch-load"></div>
+      <div class="note" id="load-note"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <header><h2>빈발 알람 (Nuisance Alarm)</h2><span class="sub">최근 7일 · 상위 6개</span></header>
+    <div class="body tight">
+      <table class="tb">
+        <thead><tr><th style="width:110px">태그</th><th>설명</th><th class="num" style="width:56px">발생</th><th style="width:180px">개선 조치</th></tr></thead>
+        <tbody id="top-tb"></tbody>
+      </table>
+      <div class="note" style="margin:10px 12px">
+        상위 3개 태그가 전체 알람의 절반 가까이를 차지합니다. 이 세 개만 잡아도 알람 부하가 크게 줄어듭니다.
+        ISA-18.2 가 말하는 알람 합리화(Rationalization)의 출발점입니다.
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="../assets/js/auth.js"></script>
+<script src="../assets/js/mock.js"></script>
+<script src="../assets/js/chart.js"></script>
+<script src="../assets/js/shell.js"></script>
+<script>
+(function () {
+  var AL = Mock.alarms();
+  var LD = Mock.alarmLoad();
+  var priC = { 1: 'var(--bad)', 2: 'var(--warn)', 3: 'var(--act)' };
+
+  function kpis() {
+    var un = AL.filter(function (a) { return !a.ack; });
+    var p1 = un.filter(function (a) { return a.pri === 1; });
+    var sh = AL.filter(function (a) { return a.shelved; });
+    var peak = Math.max.apply(null, LD.cnt);
+
+    document.getElementById('kpi').innerHTML = [
+      { t: 'ALM_UNACK', l: '미확인 알람', v: un.length, u: '건', c: un.length ? 'warn' : '' },
+      { t: 'ALM_P1',    l: 'P1 긴급',     v: p1.length, u: '건', c: p1.length ? 'alarm' : '' },
+      { t: 'ALM_DAY',   l: '금일 발생',   v: LD.day, u: '건', c: LD.day > 300 ? 'alarm' : '' },
+      { t: 'ALM_PEAK',  l: '시간당 최대', v: peak, u: '건', c: peak > LD.target ? 'warn' : '' },
+      { t: 'ALM_SHELF', l: '셸빙 중',     v: sh.length, u: '건', c: sh.length ? 'act' : '' }
+    ].map(function (k) {
+      return '<div class="pv ' + k.c + '"><div class="lip"></div>' +
+        '<div class="tag">' + k.t + '</div><div class="lbl">' + k.l + '</div>' +
+        '<div class="val">' + k.v + '<small>' + k.u + '</small></div></div>';
+    }).join('');
+  }
+
+  function elapsed(a) {
+    return a.min < 60 ? a.min + '분' : Math.floor(a.min / 60) + '시간 ' + (a.min % 60) + '분';
+  }
+
+  function render() {
+    var p = document.getElementById('f-pri').value;
+    var ar = document.getElementById('f-area').value;
+    var st = document.getElementById('f-st').value;
+
+    var list = AL.filter(function (a) {
+      if (p && a.pri !== +p) return false;
+      if (ar && a.area !== ar) return false;
+      if (st === 'un' && a.ack) return false;
+      if (st === 'ack' && !a.ack) return false;
+      if (st === 'sh' && !a.shelved) return false;
+      return true;
+    });
+
+    document.getElementById('cnt').textContent = list.length + '건';
+    document.getElementById('tb').innerHTML = list.map(function (a, i) {
+      var cls = (a.pri === 1 && !a.ack ? 'p1 ' : '') + (a.ack ? 'ack' : '');
+      var stTxt = a.shelved ? '<span class="st st-act">셸빙 (자동복귀 2h)</span>'
+                : a.ack ? '<span class="st st-idle">확인됨</span>'
+                : '<span class="st st-stop">미확인</span>';
+      return '<tr class="' + cls + '">' +
+        '<td><input type="checkbox" class="ck" data-id="' + a.id + '"></td>' +
+        '<td style="color:' + priC[a.pri] + ';font-family:var(--mono);font-weight:700">P' + a.pri + '</td>' +
+        '<td class="tag">' + a.id + '</td>' +
+        '<td class="dim">' + a.at + '</td>' +
+        '<td class="tag">' + a.tag + '</td>' +
+        '<td class="dim">' + a.area + '</td>' +
+        '<td class="dim">' + a.type + '</td>' +
+        '<td style="white-space:normal">' + a.msg + '</td>' +
+        '<td class="dim">' + elapsed(a) + '</td>' +
+        '<td>' + stTxt + '</td>' +
+        '<td>' + (a.ack ? '<button class="btn sm" data-act="detail" data-id="' + a.id + '">상세</button>'
+                        : '<button class="btn sm" data-act="ack" data-id="' + a.id + '">확인</button> ' +
+                          '<button class="btn sm" data-act="shelf" data-id="' + a.id + '">셸빙</button>') +
+        '</td></tr>';
+    }).join('');
+
+    Array.prototype.forEach.call(document.querySelectorAll('[data-act]'), function (b) {
+      b.onclick = function () {
+        var a = AL.filter(function (x) { return x.id === b.dataset.id; })[0];
+        if (b.dataset.act === 'detail') {
+          alert('알람 상세\n\nID : ' + a.id + '\n태그 : ' + a.tag + '\n구역 : ' + a.area +
+            '\n유형 : ' + a.type + '\n발생 : ' + a.date + ' ' + a.at +
+            '\n메시지 : ' + a.msg + '\n\n최근 7일 동일 태그 발생 이력을 확인하려면 트렌드 화면으로 이동하세요.');
+          return;
+        }
+        if (!Auth.canOperate()) { alert('조회전용 계정은 알람을 조작할 수 없습니다.'); return; }
+        if (b.dataset.act === 'ack') { a.ack = true; }
+        else { a.shelved = true; a.ack = true; }
+        kpis(); render();
+      };
+    });
+  }
+
+  document.getElementById('ck-all').onclick = function () {
+    var v = this.checked;
+    Array.prototype.forEach.call(document.querySelectorAll('.ck'), function (c) { c.checked = v; });
+  };
+  document.getElementById('btn-ack').onclick = function () {
+    if (!Auth.canOperate()) { alert('조회전용 계정은 알람을 조작할 수 없습니다.'); return; }
+    var ids = Array.prototype.map.call(document.querySelectorAll('.ck:checked'), function (c) { return c.dataset.id; });
+    if (!ids.length) { alert('확인할 알람을 선택하세요.'); return; }
+    AL.forEach(function (a) { if (ids.indexOf(a.id) > -1) a.ack = true; });
+    kpis(); render();
+  };
+  document.getElementById('btn-shelf').onclick = function () {
+    if (!Auth.canOperate()) { alert('조회전용 계정은 알람을 조작할 수 없습니다.'); return; }
+    var ids = Array.prototype.map.call(document.querySelectorAll('.ck:checked'), function (c) { return c.dataset.id; });
+    if (!ids.length) { alert('셸빙할 알람을 선택하세요.'); return; }
+    if (!confirm(ids.length + '건을 셸빙합니다.\n\n셸빙된 알람은 2시간 후 자동으로 해제되며,\n셸빙 이력은 감사로그에 기록됩니다.')) return;
+    AL.forEach(function (a) { if (ids.indexOf(a.id) > -1) { a.shelved = true; a.ack = true; } });
+    kpis(); render();
+  };
+  ['f-pri', 'f-area', 'f-st'].forEach(function (id) {
+    document.getElementById(id).onchange = render;
+  });
+  document.getElementById('f-go').onclick = render;
+
+  // ---- 알람 부하 ----
+  Chart.bars(document.getElementById('ch-load'), {
+    labels: LD.hours, data: LD.cnt, h: 200, showValue: false,
+    colors: LD.cnt.map(function (v) { return v > LD.target ? '#d6a02c' : '#4a5666'; })
+  });
+  var overHours = LD.cnt.filter(function (v) { return v > LD.target; }).length;
+  document.getElementById('load-note').innerHTML =
+    '금일 누계 <b>' + LD.day + '건</b> (목표 300건 이하) · 시간당 목표 초과 <b>' + overHours + '개 구간</b>.<br>' +
+    'ISA-18.2 는 운전원 1인당 정상상태에서 시간당 6건 이하를 권고합니다. ' +
+    '11시·17시 구간 초과는 CT-02 건조로 알람 반복이 원인입니다.';
+
+  // ---- 빈발 알람 ----
+  var TOP = Mock.topAlarms();
+  var tot = TOP.reduce(function (a, b) { return a + b.cnt; }, 0);
+  document.getElementById('top-tb').innerHTML = TOP.map(function (t, i) {
+    return '<tr><td class="tag">' + t.tag + '</td><td>' + t.desc + '</td>' +
+      '<td class="num" style="color:' + (i < 3 ? 'var(--warn)' : 'var(--txt)') + '">' + t.cnt + '</td>' +
+      '<td class="dim" style="white-space:normal">' + t.act + '</td></tr>';
+  }).join('') +
+  '<tr style="background:var(--panel-2)"><td colspan="2"><b>상위 6개 합계</b></td>' +
+  '<td class="num"><b>' + tot + '</b></td><td class="dim">전체의 약 ' + Math.round(tot / (tot * 1.35) * 100) + '%</td></tr>';
+
+  kpis();
+  render();
+})();
+</script>
+</body>
+</html>
