@@ -1,0 +1,16 @@
+.DS_Store
+Thumbs.db
+desktop.ini
+*.log
+*.tmp
+~$*
+.vscode/
+.idea/
+node_modules/
+
+# C++ 빌드 산출물
+src/collector/build/
+
+# .NET 빌드 산출물
+bin/
+obj/
