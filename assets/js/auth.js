@@ -8,7 +8,7 @@
   var KEY = 'shfms.session';
 
   var ACCOUNTS = [
-    { id: 'test',  pw: 'test',  name: '김현우', dept: '제어기술팀',   role: '관제운영자', lv: 3 },
+    { id: 'test',  pw: 'test',  name: '남성흠', dept: '제어기술팀',   role: '관제운영자', lv: 3 },
     { id: 'op02',  pw: 'op02',  name: '강도현', dept: '생산운전2팀', role: '운전원',     lv: 2 },
     { id: 'view',  pw: 'view',  name: '방문자', dept: '-',           role: '조회전용',   lv: 1 }
   ];
