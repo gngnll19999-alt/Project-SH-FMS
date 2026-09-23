@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>CCTV 통합관제 · SH-FMS</title>
+<link rel="stylesheet" href="../assets/css/app.css">
+<style>
+  .wall { display: grid; gap: 5px; }
+  .wall.l1 { grid-template-columns: 1fr; }
+  .wall.l4 { grid-template-columns: repeat(2, 1fr); }
+  .wall.l9 { grid-template-columns: repeat(3, 1fr); }
+  .wall.l12 { grid-template-columns: repeat(4, 1fr); }
+
+  .tile {
+    background: #07090c; border: 1px solid var(--line); border-radius: 2px;
+    overflow: hidden; cursor: pointer; position: relative;
+  }
+  .tile.sel { border-color: var(--accent); }
+  .tile.alert { border-color: var(--bad); }
+  .tile .bar {
+    display: flex; align-items: center; gap: 6px;
+    padding: 3px 6px; font-size: 10px; border-top: 1px solid var(--line);
+    background: #0d1116; color: var(--dim);
+  }
+  .tile .bar .nm { flex: 1; color: var(--txt-2); }
+  .tile .bar .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--ok); }
+  .tile .bar .dot.off { background: #3d4652; }
+
+  .camlist { max-height: 420px; overflow-y: auto; }
+  .camlist .c {
+    display: flex; align-items: center; gap: 7px; padding: 6px 10px;
+    border-bottom: 1px solid #1c232c; font-size: 11.5px; cursor: pointer;
+  }
+  .camlist .c:hover { background: #1a2029; }
+  .camlist .c.on { background: #12242a; color: var(--accent); }
+  .camlist .c .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--ok); flex: 0 0 auto; }
+  .camlist .c .dot.off { background: #3d4652; }
+  .camlist .c .id { font-family: var(--mono); color: var(--dim); width: 52px; flex: 0 0 auto; }
+  .camlist .c .nm { flex: 1; }
+  .camlist .c .ai { font-size: 9.5px; color: var(--act); }
+
+  .ptz { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; max-width: 168px; margin: 0 auto; }
+  .ptz button {
+    aspect-ratio: 1; background: var(--panel-2); border: 1px solid var(--line);
+    color: var(--txt-2); border-radius: 2px; cursor: pointer; font-size: 14px; font-family: inherit;
+  }
+  .ptz button:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+  .ptz button:disabled { opacity: .3; cursor: not-allowed; }
+  .ptz .mid { background: none; border: none; font-size: 10px; }
+
+  .zoomrow { display: flex; gap: 4px; margin-top: 8px; }
+  .zoomrow button { flex: 1; padding: 6px; }
+
+  .tl {
+    position: relative; height: 34px; background: #0d1116;
+    border: 1px solid var(--line); border-radius: 2px; overflow: hidden; cursor: pointer;
+  }
+  .tl .seg { position: absolute; top: 0; bottom: 0; background: rgba(95,125,153,.35); }
+  .tl .seg.ev { background: rgba(214,72,60,.55); }
+  .tl .cursor { position: absolute; top: 0; bottom: 0; width: 1px; background: var(--accent); }
+  .tl .hr { position: absolute; top: 0; bottom: 0; width: 1px; background: #1c232c; }
+  .tl .lbl { position: absolute; bottom: 2px; font-size: 8.5px; color: var(--dim); font-family: var(--mono); transform: translateX(-50%); }
+</style>
+</head>
+<body data-page="cctv" data-title="CCTV 통합관제" data-crumb="12 채널" data-lvl="ISA-101 LEVEL 3">
+
+<div class="filters">
+  <label>분할</label>
+  <select id="f-layout"><option value="4">4분할</option><option value="1">단일</option><option value="9">9분할</option><option value="12">12분할</option></select>
+  <label>구역</label>
+  <select id="f-area"><option value="">전체</option><option>A동</option><option>B동</option><option>C동</option><option>D동</option><option>유틸</option><option>외곽</option></select>
+  <label>AI 분석</label>
+  <select id="f-ai"><option value="">전체</option><option value="on">분석 활성만</option></select>
+  <button class="btn pri" id="f-go">적용</button>
+  <div style="flex:1"></div>
+  <button class="btn" id="btn-seq">순차 감시 시작</button>
+  <button class="btn" onclick="alert('녹화 검색\n\n기간 · 카메라 · 이벤트 유형으로 녹화본을 검색합니다.\n검색 결과는 타임라인에 표시되며 구간 내보내기가 가능합니다.')">녹화 검색</button>
+  <span class="dim" style="font-size:11px" id="seqmsg"></span>
+</div>
+
+<div class="grid" style="grid-template-columns:1fr 300px;align-items:start">
+  <div>
+    <div class="card" style="margin-bottom:10px">
+      <header>
+        <h2>영상 감시</h2><span class="sub" id="wall-sub"></span>
+        <div class="spacer"></div>
+        <div class="legend">
+          <span><i style="background:#4f9e63"></i>녹화중</span>
+          <span><i style="background:#4a86d8"></i>AI 분석</span>
+          <span><i style="background:#d6483c"></i>이벤트</span>
+        </div>
+      </header>
+      <div class="body" style="padding:8px">
+        <div class="wall l4" id="wall"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <header><h2>녹화 타임라인</h2><span class="sub" id="tl-sub">CAM-06 · 최근 24시간</span>
+        <div class="spacer"></div>
+        <button class="btn sm" onclick="alert('선택 구간을 내보냅니다.\n형식: MP4 (H.265) · 워터마크 포함')">구간 내보내기</button>
+      </header>
+      <div class="body">
+        <div class="tl" id="tl"></div>
+        <div class="note">붉은 구간은 AI 이벤트가 검출된 시점입니다. 타임라인을 클릭하면 해당 시각 녹화본이 재생됩니다.</div>
+      </div>
+    </div>
+  </div>
+
+  <div>
+    <div class="card" style="margin-bottom:10px">
+      <header><h2>카메라 목록</h2><span class="sub" id="cam-cnt"></span></header>
+      <div class="body tight camlist" id="camlist"></div>
+    </div>
+
+    <div class="card" style="margin-bottom:10px">
+      <header><h2>PTZ 제어</h2><span class="sub" id="ptz-sub"></span></header>
+      <div class="body">
+        <div class="ptz" id="ptz">
+          <button data-d="↖">↖</button><button data-d="↑">↑</button><button data-d="↗">↗</button>
+          <button data-d="←">←</button><button class="mid" disabled>PTZ</button><button data-d="→">→</button>
+          <button data-d="↙">↙</button><button data-d="↓">↓</button><button data-d="↘">↘</button>
+        </div>
+        <div class="zoomrow">
+          <button class="btn" data-z="in">ZOOM +</button>
+          <button class="btn" data-z="out">ZOOM −</button>
+          <button class="btn" data-z="home">HOME</button>
+        </div>
+        <div style="margin-top:10px">
+          <div class="dim" style="font-size:10.5px;margin-bottom:5px">프리셋</div>
+          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:4px">
+            <button class="btn sm" onclick="alert('프리셋 1: 전경')">P1</button>
+            <button class="btn sm" onclick="alert('프리셋 2: 투입구')">P2</button>
+            <button class="btn sm" onclick="alert('프리셋 3: 출구')">P3</button>
+            <button class="btn sm" onclick="alert('프리셋 4: 통로')">P4</button>
+          </div>
+        </div>
+        <div class="note" id="ptz-note"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <header><h2>AI 영상분석 이벤트</h2><span class="sub">최근</span></header>
+      <div class="body tight" style="max-height:250px;overflow-y:auto">
+        <table class="tb"><tbody id="ev-tb"></tbody></table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="../assets/js/auth.js"></script>
+<script src="../assets/js/mock.js"></script>
+<script src="../assets/js/chart.js"></script>
+<script src="../assets/js/cctv.js"></script>
+<script src="../assets/js/shell.js"></script>
+<script>
+(function () {
+  var CAMS = Mock.CAMS;
+  var sel = 'CAM-06';
+  var seqTimer = null;
+
+  function filtered() {
+    var a = document.getElementById('f-area').value;
+    var ai = document.getElementById('f-ai').value;
+    return CAMS.filter(function (c) {
+      if (a && c.area !== a) return false;
+      if (ai === 'on' && (!c.ai || c.ai === '-')) return false;
+      return true;
+    });
+  }
+
+  function alerted(c) {
+    return c.ai === '위험구역 진입' || c.id === 'CAM-06';
+  }
+
+  function drawWall() {
+    var n = +document.getElementById('f-layout').value;
+    var list = filtered();
+    var show = n === 1 ? list.filter(function (c) { return c.id === sel; }) : list.slice(0, n);
+    if (n === 1 && !show.length) show = [list[0]];
+
+    var wall = document.getElementById('wall');
+    wall.className = 'wall l' + n;
+    Cctv.clear();
+
+    wall.innerHTML = show.map(function (c) {
+      return '<div class="tile ' + (c.id === sel ? 'sel' : '') + (alerted(c) ? ' alert' : '') + '" data-id="' + c.id + '">' +
+        '<div class="feed" id="w-' + c.id + '"></div>' +
+        '<div class="bar"><span class="dot ' + (c.rec ? '' : 'off') + '"></span>' +
+        '<span class="nm">' + c.id + ' · ' + c.name + '</span>' +
+        (c.ptz ? '<span style="color:#79a6e5">PTZ</span>' : '') +
+        (c.ai !== '-' ? '<span style="color:#79a6e5">AI</span>' : '') +
+        '</div></div>';
+    }).join('');
+
+    show.forEach(function (c) {
+      Cctv.attach(document.getElementById('w-' + c.id), c);
+    });
+
+    Array.prototype.forEach.call(wall.querySelectorAll('.tile'), function (t) {
+      t.onclick = function () { pick(t.dataset.id); };
+      t.ondblclick = function () {
+        document.getElementById('f-layout').value = '1';
+        pick(t.dataset.id);
+        drawWall();
+      };
+    });
+
+    document.getElementById('wall-sub').textContent = show.length + ' / ' + CAMS.length + ' 채널 표출';
+  }
+
+  function drawList() {
+    var list = filtered();
+    document.getElementById('cam-cnt').textContent = list.length + ' / ' + CAMS.length;
+    document.getElementById('camlist').innerHTML = list.map(function (c) {
+      return '<div class="c ' + (c.id === sel ? 'on' : '') + '" data-id="' + c.id + '">' +
+        '<span class="dot ' + (c.rec ? '' : 'off') + '"></span>' +
+        '<span class="id">' + c.id + '</span>' +
+        '<span class="nm">' + c.name + '</span>' +
+        (c.ai !== '-' ? '<span class="ai">' + c.ai + '</span>' : '') + '</div>';
+    }).join('');
+    Array.prototype.forEach.call(document.querySelectorAll('.camlist .c'), function (el) {
+      el.onclick = function () { pick(el.dataset.id); drawWall(); };
+    });
+  }
+
+  function pick(id) {
+    sel = id;
+    var c = CAMS.filter(function (x) { return x.id === id; })[0];
+    document.getElementById('ptz-sub').textContent = c.id + ' · ' + c.name;
+    document.getElementById('tl-sub').textContent = c.id + ' · 최근 24시간';
+    var can = c.ptz && Auth.canOperate();
+    Array.prototype.forEach.call(document.querySelectorAll('#ptz button[data-d]'), function (b) { b.disabled = !can; });
+    document.getElementById('ptz-note').textContent = !c.ptz
+      ? '이 카메라는 고정형입니다. PTZ 제어를 지원하지 않습니다.'
+      : (Auth.canOperate() ? 'ONVIF PTZ 프로파일로 제어합니다. 조작 이력은 감사로그에 기록됩니다.'
+                           : '조회전용 계정은 PTZ 를 조작할 수 없습니다.');
+    drawList();
+    drawTimeline();
+    Array.prototype.forEach.call(document.querySelectorAll('.tile'), function (t) {
+      t.classList.toggle('sel', t.dataset.id === sel);
+    });
+  }
+
+  // ---- PTZ ----
+  Array.prototype.forEach.call(document.querySelectorAll('#ptz button[data-d]'), function (b) {
+    b.onclick = function () {
+      var c = CAMS.filter(function (x) { return x.id === sel; })[0];
+      document.getElementById('ptz-note').textContent =
+        c.id + ' PTZ ' + b.dataset.d + ' 이동 명령 전송 (' + Mock.hms(new Date()) + ')';
+    };
+  });
+  Array.prototype.forEach.call(document.querySelectorAll('[data-z]'), function (b) {
+    b.onclick = function () {
+      var c = CAMS.filter(function (x) { return x.id === sel; })[0];
+      if (!c.ptz) { alert('고정형 카메라입니다.'); return; }
+      if (!Auth.canOperate()) { alert('조회전용 계정은 조작할 수 없습니다.'); return; }
+      document.getElementById('ptz-note').textContent =
+        c.id + ' ' + (b.dataset.z === 'home' ? 'HOME 위치 복귀' : 'ZOOM ' + b.dataset.z.toUpperCase()) +
+        ' (' + Mock.hms(new Date()) + ')';
+    };
+  });
+
+  // ---- 타임라인 ----
+  function drawTimeline() {
+    var tl = document.getElementById('tl');
+    var h = '';
+    // 녹화 구간 (거의 전 구간 녹화, 02~04시는 정비로 미녹화)
+    h += '<div class="seg" style="left:0%;width:8.3%"></div>';
+    h += '<div class="seg" style="left:16.6%;width:83.4%"></div>';
+    // 이벤트 구간
+    [[38, 1.2], [56, 0.8], [71, 1.5], [88, 2.1], [95, 0.9]].forEach(function (e) {
+      h += '<div class="seg ev" style="left:' + e[0] + '%;width:' + e[1] + '%"></div>';
+    });
+    for (var i = 1; i < 24; i++) {
+      h += '<div class="hr" style="left:' + (i / 24 * 100) + '%"></div>';
+      if (i % 3 === 0) h += '<div class="lbl" style="left:' + (i / 24 * 100) + '%">' + (i < 10 ? '0' + i : i) + '</div>';
+    }
+    var now = new Date();
+    var pct = (now.getHours() * 60 + now.getMinutes()) / 1440 * 100;
+    h += '<div class="cursor" style="left:' + pct + '%"></div>';
+    tl.innerHTML = h;
+    tl.onclick = function (e) {
+      var r = tl.getBoundingClientRect();
+      var p = (e.clientX - r.left) / r.width;
+      var mins = Math.round(p * 1440);
+      alert(sel + ' 녹화 재생\n\n시각 : ' + String(Math.floor(mins / 60)).padStart(2, '0') + ':' +
+        String(mins % 60).padStart(2, '0') + '\n\n(데모 화면이라 실제 재생은 수행하지 않습니다)');
+    };
+  }
+
+  // ---- 이벤트 ----
+  var evC = { bad: 'var(--bad)', warn: 'var(--warn)', info: 'var(--dim)' };
+  document.getElementById('ev-tb').innerHTML = Mock.camEvents().map(function (e) {
+    return '<tr style="cursor:pointer" onclick="alert(\'' + e.cam + ' ' + e.at + ' 이벤트 영상 재생\')">' +
+      '<td class="dim" style="width:52px">' + e.at + '</td>' +
+      '<td class="tag" style="width:58px">' + e.cam + '</td>' +
+      '<td style="width:88px;color:' + evC[e.lv] + '">' + e.t + '</td>' +
+      '<td style="white-space:normal" class="dim">' + e.d + '</td></tr>';
+  }).join('');
+
+  // ---- 순차 감시 ----
+  document.getElementById('btn-seq').onclick = function () {
+    if (seqTimer) {
+      clearInterval(seqTimer); seqTimer = null;
+      this.textContent = '순차 감시 시작';
+      document.getElementById('seqmsg').textContent = '';
+      return;
+    }
+    this.textContent = '순차 감시 중지';
+    document.getElementById('f-layout').value = '1';
+    var i = 0;
+    var list = filtered();
+    seqTimer = setInterval(function () {
+      i = (i + 1) % list.length;
+      pick(list[i].id);
+      drawWall();
+      document.getElementById('seqmsg').textContent = '순차 감시 중 · 10초 간격 · ' + list[i].id;
+    }, 10000);
+    document.getElementById('seqmsg').textContent = '순차 감시 중 · 10초 간격';
+  };
+
+  ['f-layout', 'f-area', 'f-ai'].forEach(function (id) {
+    document.getElementById(id).onchange = function () { drawList(); drawWall(); };
+  });
+  document.getElementById('f-go').onclick = function () { drawList(); drawWall(); };
+
+  drawList();
+  drawWall();
+  pick(sel);
+})();
+</script>
+</body>
+</html>
