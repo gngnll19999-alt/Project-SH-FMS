@@ -1,0 +1,97 @@
+{
+  "scan_period_ms": 1000,
+
+  "gateway": {
+    "host": "127.0.0.1",
+    "port": 5080,
+    "path": "/api/v1/tags/batch",
+    "api_key": "CHANGE-ME-BEFORE-DEPLOY"
+  },
+
+  "devices": [
+    {
+      "id": "MIX-01",
+      "protocol": "ls_xgt",
+      "host": "192.168.10.11",
+      "port": 2004,
+      "unit_id": 0,
+      "timeout_ms": 800,
+      "read_start": 100,
+      "read_count": 32,
+      "tags": [
+        { "name": "MIX01_TT101", "address": 100, "words": 1, "scale": 0.1,   "deadband": 0.2,  "unit": "C",   "desc": "배합 1호기 반응조 온도" },
+        { "name": "MIX01_PT102", "address": 101, "words": 1, "scale": 0.01,  "deadband": 0.02, "unit": "bar", "desc": "배합 1호기 내압" },
+        { "name": "MIX01_ST103", "address": 102, "words": 1, "scale": 1.0,   "deadband": 2.0,  "unit": "rpm", "desc": "배합 1호기 교반속도" },
+        { "name": "MIX01_LV104", "address": 103, "words": 1, "scale": 0.1,   "deadband": 0.5,  "unit": "%",   "desc": "배합 1호기 레벨" },
+        { "name": "MIX01_JT105", "address": 104, "words": 1, "scale": 0.1,   "deadband": 0.3,  "unit": "C",   "desc": "배합 1호기 자켓 온도" }
+      ]
+    },
+    {
+      "id": "MIX-02",
+      "protocol": "ls_xgt",
+      "host": "192.168.10.12",
+      "port": 2004,
+      "unit_id": 0,
+      "timeout_ms": 800,
+      "read_start": 200,
+      "read_count": 32,
+      "tags": [
+        { "name": "MIX02_TT201", "address": 200, "words": 1, "scale": 0.1,  "deadband": 0.2,  "unit": "C",   "desc": "배합 2호기 반응조 온도" },
+        { "name": "MIX02_PT202", "address": 201, "words": 1, "scale": 0.01, "deadband": 0.02, "unit": "bar", "desc": "배합 2호기 내압" },
+        { "name": "MIX02_ST203", "address": 202, "words": 1, "scale": 1.0,  "deadband": 2.0,  "unit": "rpm", "desc": "배합 2호기 교반속도" },
+        { "name": "MIX02_LV204", "address": 203, "words": 1, "scale": 0.1,  "deadband": 0.5,  "unit": "%",   "desc": "배합 2호기 레벨" },
+        { "name": "MIX02_JT205", "address": 204, "words": 1, "scale": 0.1,  "deadband": 0.3,  "unit": "C",   "desc": "배합 2호기 자켓 온도" }
+      ]
+    },
+    {
+      "id": "CT-01",
+      "protocol": "modbus_tcp",
+      "host": "192.168.20.21",
+      "port": 502,
+      "unit_id": 1,
+      "timeout_ms": 600,
+      "read_start": 300,
+      "read_count": 40,
+      "tags": [
+        { "name": "CT01_TT301", "address": 300, "words": 1, "scale": 0.1,    "deadband": 0.3,    "unit": "C",     "desc": "코팅 1라인 건조로 온도" },
+        { "name": "CT01_SP302", "address": 301, "words": 1, "scale": 0.1,    "deadband": 0.2,    "unit": "m/min", "desc": "코팅 1라인 라인속도" },
+        { "name": "CT01_TH303", "address": 302, "words": 2, "float": true,   "deadband": 0.0005, "unit": "mm",    "desc": "코팅 1라인 도포두께" },
+        { "name": "CT01_LD304", "address": 304, "words": 1, "scale": 0.1,    "deadband": 1.0,    "unit": "%",     "desc": "코팅 1라인 모터 부하" },
+        { "name": "CT01_TN305", "address": 305, "words": 1, "scale": 0.1,    "deadband": 0.5,    "unit": "N",     "desc": "코팅 1라인 장력" }
+      ]
+    },
+    {
+      "id": "CT-02",
+      "protocol": "modbus_tcp",
+      "host": "192.168.20.22",
+      "port": 502,
+      "unit_id": 1,
+      "timeout_ms": 600,
+      "read_start": 400,
+      "read_count": 40,
+      "tags": [
+        { "name": "CT02_TT401", "address": 400, "words": 1, "scale": 0.1, "deadband": 0.3, "unit": "C",     "desc": "코팅 2라인 건조로 온도" },
+        { "name": "CT02_SP402", "address": 401, "words": 1, "scale": 0.1, "deadband": 0.2, "unit": "m/min", "desc": "코팅 2라인 라인속도" },
+        { "name": "CT02_LD404", "address": 404, "words": 1, "scale": 0.1, "deadband": 1.0, "unit": "%",     "desc": "코팅 2라인 모터 부하" }
+      ]
+    },
+    {
+      "id": "UTL-01",
+      "protocol": "modbus_tcp",
+      "host": "192.168.30.31",
+      "port": 502,
+      "unit_id": 3,
+      "timeout_ms": 600,
+      "read_start": 700,
+      "read_count": 24,
+      "tags": [
+        { "name": "UTL_AIR701", "address": 700, "words": 1, "scale": 0.01, "deadband": 0.02, "unit": "bar", "desc": "압축공기 공급압" },
+        { "name": "UTL_CHW702", "address": 701, "words": 1, "scale": 0.1,  "deadband": 0.2,  "unit": "C",   "desc": "냉각수 공급온도" },
+        { "name": "UTL_STM703", "address": 702, "words": 1, "scale": 0.01, "deadband": 0.05, "unit": "bar", "desc": "스팀 헤더압" },
+        { "name": "UTL_PWR704", "address": 704, "words": 2, "scale": 0.1,  "deadband": 5.0,  "unit": "kW",  "desc": "수전 유효전력" },
+        { "name": "ENV_VOC801", "address": 710, "words": 1, "scale": 0.1,  "deadband": 0.5,  "unit": "ppm", "desc": "A동 VOC 농도" },
+        { "name": "ENV_O2802",  "address": 711, "words": 1, "scale": 0.1,  "deadband": 0.1,  "unit": "%",   "desc": "B동 산소 농도" }
+      ]
+    }
+  ]
+}
