@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>로그인 · SH-FMS</title>
+<link rel="stylesheet" href="assets/css/app.css">
+<style>
+  body { display: grid; place-items: center; background: #080b10; }
+  .login {
+    width: 372px; background: var(--panel); border: 1px solid var(--line);
+    border-radius: 4px; padding: 32px 30px 26px;
+  }
+  .login .top { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+  .login .mk { width: 30px; height: 30px; border: 2px solid var(--accent); border-radius: 50%; position: relative; }
+  .login .mk::after { content: ""; position: absolute; left: 7px; top: 7px; width: 12px; height: 12px; border-radius: 50%; background: var(--accent); }
+  .login .top b { font-size: 18px; letter-spacing: .5px; display: block; }
+  .login .top span { font-size: 10.5px; color: var(--dim); }
+  .login .warn-box {
+    border: 1px solid rgba(214,160,44,.35); background: rgba(214,160,44,.07);
+    color: #e0b658; font-size: 11px; padding: 8px 10px; border-radius: 2px; margin: 16px 0 20px;
+    line-height: 1.7;
+  }
+  .login label { display: block; font-size: 11px; color: var(--dim); margin: 0 0 5px; }
+  .login input { width: 100%; padding: 9px 11px; font-size: 13px; margin-bottom: 13px; }
+  .login button {
+    width: 100%; padding: 10px; background: #16414a; border: 1px solid var(--accent);
+    color: #d6f6fb; border-radius: 2px; font-size: 14px; font-weight: 700; cursor: pointer; font-family: inherit;
+  }
+  .login button:hover { background: var(--accent); color: #04222a; }
+  .err { color: #e57b71; font-size: 12px; min-height: 18px; margin: -6px 0 5px; }
+  .demo {
+    margin-top: 20px; padding-top: 15px; border-top: 1px solid var(--line);
+    font-size: 11px; color: var(--dim); line-height: 1.95;
+  }
+  .demo b { color: var(--txt); }
+  .demo code { font-family: var(--mono); color: #8fc5d0; background: #0d1116; padding: 1px 5px; border-radius: 2px; }
+  .back { display: block; text-align: center; margin-top: 16px; font-size: 12px; color: var(--dim); }
+  .back:hover { color: var(--txt); }
+</style>
+</head>
+<body>
+
+<form class="login" id="f" autocomplete="off">
+  <div class="top">
+    <span class="mk"></span>
+    <span><b>SH-FMS</b><span>자동화공장 통합 모니터링 v3.2</span></span>
+  </div>
+
+  <div class="warn-box">
+    제어망 연결 시스템입니다. 관제 조작(알람 확인 · 셸빙)은 등급 2 이상 계정만 가능합니다.
+  </div>
+
+  <label for="uid">사번 / 아이디</label>
+  <input type="text" id="uid" placeholder="사번을 입력하세요" autofocus>
+
+  <label for="upw">비밀번호</label>
+  <input type="password" id="upw" placeholder="비밀번호">
+
+  <div class="err" id="err"></div>
+  <button type="submit">관제 화면 접속</button>
+
+  <div class="demo">
+    <b>데모 계정</b><br>
+    관제운영자 <code>test</code> / <code>test</code> — 등급 3 (전 권한)<br>
+    운전원 &nbsp;&nbsp;&nbsp;&nbsp;<code>op02</code> / <code>op02</code> — 등급 2 (ACK · 셸빙)<br>
+    조회전용 &nbsp;&nbsp;<code>view</code> / <code>view</code> — 등급 1 (조회만)
+  </div>
+
+  <a class="back" href="index.html">← 시스템 소개로 돌아가기</a>
+</form>
+
+<script src="assets/js/auth.js"></script>
+<script>
+document.getElementById('f').addEventListener('submit', function (e) {
+  e.preventDefault();
+  var id = document.getElementById('uid').value, pw = document.getElementById('upw').value;
+  var err = document.getElementById('err');
+  if (!id || !pw) { err.textContent = '사번과 비밀번호를 모두 입력하세요.'; return; }
+
+  var s = Auth.login(id, pw);
+  if (!s) {
+    err.textContent = '사번 또는 비밀번호가 올바르지 않습니다.';
+    document.getElementById('upw').value = '';
+    document.getElementById('upw').focus();
+    return;
+  }
+  var q = new URLSearchParams(location.search).get('redirect');
+  var ok = /^[a-z]+\.html$/.test(q || '');
+  location.href = 'app/' + (ok ? q : 'overview.html');
+});
+</script>
+</body>
+</html>

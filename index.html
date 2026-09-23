@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SH-FMS 자동화공장 통합 모니터링</title>
+<meta name="description" content="공정 감시 · 알람 · CCTV · 에너지 · 안전을 하나로 묶는 공장 통합 모니터링 시스템. C++ 수집기 + C# 게이트웨이.">
+<link rel="stylesheet" href="assets/css/intro.css">
+</head>
+<body>
+
+<div class="nav">
+  <div class="wrap">
+    <a href="index.html" class="logo"><span class="mk"></span>
+      <span><b>SH-FMS</b> <span>통합 모니터링</span></span></a>
+    <div class="menu">
+      <a href="#scope">감시 범위</a>
+      <a href="#hmi">HMI 설계원칙</a>
+      <a href="#arch">시스템 구성</a>
+      <a href="#stack">C++ · C#</a>
+      <a href="#screen">화면 구성</a>
+    </div>
+    <a href="login.html" class="go">관제 화면 접속</a>
+  </div>
+</div>
+
+<div class="hero">
+  <div class="wrap">
+    <span class="tag">ISA-101 고성능 HMI · ISA-18.2 알람관리 · OPC UA · ONVIF</span>
+    <h1>공정과 영상과 알람을<br><em>한 화면에서</em> 보는 통합 관제</h1>
+    <p>
+      PLC 태그, CCTV, 에너지, 안전 센서를 한 곳으로 모읍니다.
+      화면은 ISA-101 고성능 HMI 원칙을 따라 평상시에는 무채색이고, 색은 이상 상태에만 씁니다.
+      예쁜 대시보드를 만들면 운전원이 정작 이상을 못 찾는다는 게 1차 관제실 운영에서 얻은 교훈입니다.
+    </p>
+    <div class="btns">
+      <a href="login.html" class="btn pri">관제 화면 접속</a>
+      <a href="#stack" class="btn">수집기 구조 보기</a>
+    </div>
+    <div class="facts">
+      <div><b>1,284</b><span>수집 태그</span></div>
+      <div><b>1s</b><span>스캔 주기</span></div>
+      <div><b>12</b><span>연동 카메라</span></div>
+      <div><b>8</b><span>관제 화면</span></div>
+    </div>
+  </div>
+</div>
+
+<section id="scope">
+  <div class="wrap">
+    <h2>감시 범위</h2>
+    <p class="lead">제조(조립) · 생산(코팅) · 화학(배합) 공정이 한 공장에 섞여 있어, 세 가지 성격의 감시를 모두 담았습니다.</p>
+    <div class="cards">
+      <div class="c">
+        <div class="n">L1 · 공장 개요</div>
+        <h3>전체 공정 실시간 감시</h3>
+        <p>동별 · 라인별 가동상태와 핵심 공정값을 한 화면에 표출합니다. 관제실 대형 모니터 상시 표출용으로 자동 갱신됩니다.</p>
+        <div class="std">ISA-101 Level 1 (Plant Overview)</div>
+      </div>
+      <div class="c">
+        <div class="n">L2 · 유닛</div>
+        <h3>라인 공정 미믹</h3>
+        <p>설비 배치도 위에 흐름과 공정값을 겹쳐 보여줍니다. 값이 정상 범위를 벗어날 때만 색이 들어옵니다.</p>
+        <div class="std">ISA-101 Level 2 (Unit Control)</div>
+      </div>
+      <div class="c">
+        <div class="n">L2 · 화학</div>
+        <h3>배치 반응기 감시</h3>
+        <p>반응기별 온도 · 압력 · 교반속도 · 레벨을 설정값과 함께 표시하고, 페이즈 진행과 잔여시간을 추적합니다.</p>
+        <div class="std">ISA-88 배치 페이즈 연동</div>
+      </div>
+      <div class="c">
+        <div class="n">L3 · 영상</div>
+        <h3>CCTV 통합관제</h3>
+        <p>12개 카메라 다분할 감시, PTZ 제어, AI 영상분석(위험구역 진입 · 안전모 미착용 · 화재 감지) 이벤트를 알람과 연계합니다.</p>
+        <div class="std">ONVIF / RTSP → WebRTC 중계</div>
+      </div>
+      <div class="c">
+        <div class="n">L4 · 알람</div>
+        <h3>알람 관리</h3>
+        <p>우선순위 3단계, 확인(ACK) · 셸빙 · 상태기반 억제를 지원합니다. 알람 부하를 KPI로 관리해 알람 홍수를 막습니다.</p>
+        <div class="std">ISA-18.2 (시간당 6건 / 1일 300건 목표)</div>
+      </div>
+      <div class="c">
+        <div class="n">유틸 · 안전</div>
+        <h3>에너지 · 안전 관제</h3>
+        <p>전력 · 스팀 · 용수 사용량과 원단위를 관리하고, 구역별 위험요인 · 가스 · 화재 · 출입 현황을 감시합니다.</p>
+        <div class="std">FEMS / 중대재해처벌법 대응</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="hmi" class="alt">
+  <div class="wrap">
+    <h2>HMI 설계 원칙</h2>
+    <p class="lead">
+      1차 관제실 화면은 상태마다 색을 다 넣어서 알록달록했습니다. 그런데 정작 이상이 발생해도 눈에 안 띄었습니다.
+      이번에는 ISA-101 원칙을 지키기로 하고 색 예산을 엄격하게 잡았습니다.
+    </p>
+    <div class="two">
+      <div>
+        <h3 style="font-size:15px;margin:0 0 10px">색 사용 규칙</h3>
+        <ul class="bullet">
+          <li><b>평상시</b> 저채도 회색. 정상 운전 중에는 화면에 색이 거의 없습니다</li>
+          <li><b>노랑</b> 경고 — 규격 접근, 설정값 편차</li>
+          <li><b>빨강</b> 알람 — 상한상한/하한하한 초과, 트립</li>
+          <li><b>파랑</b> 조작자 조치 필요</li>
+          <li><b>시안(브랜드색)</b> 네비게이션 전용. 공정 데이터에는 쓰지 않습니다</li>
+        </ul>
+      </div>
+      <div>
+        <h3 style="font-size:15px;margin:0 0 10px">화면 계층</h3>
+        <ul class="bullet">
+          <li><b>Level 1</b> 공장 전체 개요 — 핵심 지표 한눈에</li>
+          <li><b>Level 2</b> 단일 유닛 + 일상 운전</li>
+          <li><b>Level 3</b> 개별 설비 상세 · 진단 · 영상</li>
+          <li><b>Level 4</b> 트렌드 · 알람 상세 · 분석</li>
+          <li><b>알람 배너</b> 어느 화면에 있든 최상단에 고정 — 다른 화면을 보다가 알람을 놓치면 안 됩니다</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="arch">
+  <div class="wrap">
+    <h2>시스템 구성</h2>
+    <p class="lead">ISA-95 계층에서 SH-FMS는 Level 2에 해당합니다. 상위 MES/ERP와는 읽기 전용 API로만 붙습니다.</p>
+    <div class="stack">
+      <div class="lv">
+        <div class="l">Level 4</div>
+        <div class="r"><b>SH-ERP</b><span>에너지 사용량 수신 (제조경비 배부 기초자료)</span></div>
+      </div>
+      <div class="lv">
+        <div class="l">Level 3</div>
+        <div class="r"><b>SH-MES</b><span>설비 가동상태 · 알람 · 공정 태그값 양방향</span></div>
+      </div>
+      <div class="lv me">
+        <div class="l">Level 2</div>
+        <div class="r"><b>SH-FMS — 통합 모니터링 (본 시스템)</b><span>C# 게이트웨이 + 히스토리안 + 웹 관제 화면 + CCTV 중계</span></div>
+      </div>
+      <div class="lv">
+        <div class="l">Level 1</div>
+        <div class="r"><b>C++ 수집기 (Collector)</b><span>Modbus TCP · LS XGT · Mitsubishi MC → 태그 정규화 → 게이트웨이 전송</span></div>
+      </div>
+      <div class="lv">
+        <div class="l">Level 0</div>
+        <div class="r"><b>PLC · 센서 · 카메라</b><span>LS XGT / Mitsubishi / 가스검지기 / ONVIF IP 카메라</span></div>
+      </div>
+    </div>
+
+    <div class="two" style="margin-top:32px">
+      <div>
+        <h3 style="font-size:15px;margin:0 0 10px">데이터 경로</h3>
+        <ul class="bullet">
+          <li><b>수집</b> C++ 수집기가 PLC 를 1초 주기로 폴링</li>
+          <li><b>정규화</b> 엔지니어링 단위 변환 + 데드밴드 적용</li>
+          <li><b>전송</b> 게이트웨이로 배치 전송 (변화분만)</li>
+          <li><b>저장</b> 히스토리안에 시계열 적재</li>
+          <li><b>배포</b> SignalR 로 브라우저에 실시간 푸시</li>
+        </ul>
+      </div>
+      <div>
+        <h3 style="font-size:15px;margin:0 0 10px">설계 제약</h3>
+        <ul class="bullet">
+          <li><b>읽기 전용</b> 본 시스템은 감시만 합니다. 설비 제어는 SCADA/PLC 권한</li>
+          <li><b>히스토리안 경유</b> 상위 시스템은 SCADA 서버가 아니라 히스토리안 읽기전용 API로만 접근</li>
+          <li><b>망 분리</b> 제어망과 사무망 사이에 단방향 게이트웨이</li>
+          <li><b>외부 의존 없음</b> 화면은 폐쇄망에서 CDN 없이 동작</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="stack" class="alt">
+  <div class="wrap">
+    <h2>C++ 수집기 · C# 게이트웨이</h2>
+    <p class="lead">
+      수집기를 C++로 쓴 이유는 단순합니다. 1초 주기로 8개 PLC · 1,284 태그를 폴링하는데
+      GC 일시정지로 스캔이 밀리면 곤란하기 때문입니다. 게이트웨이는 REST/SignalR/DB 연동이 주 업무라
+      C# (ASP.NET Core) 가 생산성이 훨씬 좋습니다.
+    </p>
+
+    <div class="two">
+      <div>
+        <h3 style="font-size:15px;margin:0 0 10px">C++ 수집기 — <code style="font-family:Consolas,monospace;color:#5fd6e8">src/collector</code></h3>
+        <pre class="code"><span class="c">// 폴링 루프 (main.cpp)</span>
+<span class="k">while</span> (running) {
+  <span class="k">auto</span> t0 = steady_clock::now();
+
+  <span class="k">for</span> (<span class="k">auto</span>&amp; dev : devices) {
+    <span class="k">auto</span> raw = dev-&gt;read_block();      <span class="c">// 프로토콜별 구현</span>
+    store.apply(dev-&gt;id(), raw);        <span class="c">// 단위환산 + 데드밴드</span>
+  }
+
+  uploader.flush(store.take_changed());  <span class="c">// 변화분만 전송</span>
+  sleep_until(t0 + scan_period);         <span class="c">// 주기 고정</span>
+}</pre>
+        <ul class="bullet" style="margin-top:12px">
+          <li>프로토콜 드라이버: Modbus TCP / LS XGT / Mitsubishi MC</li>
+          <li>데드밴드로 불필요한 전송 제거 (네트워크 부하 ↓)</li>
+          <li>스캔 주기 고정 — 지터를 로그로 감시</li>
+          <li>PLC 단절 시 지수 백오프 재접속</li>
+        </ul>
+      </div>
+
+      <div>
+        <h3 style="font-size:15px;margin:0 0 10px">C# 게이트웨이 — <code style="font-family:Consolas,monospace;color:#5fd6e8">src/SHFms.Server</code></h3>
+        <pre class="code"><span class="c">// 태그 수신 → 알람 평가 → 브라우저 푸시</span>
+app.MapPost(<span class="s">"/api/v1/tags/batch"</span>, <span class="k">async</span> (
+    TagBatch batch, TagStore store,
+    AlarmEngine alarms, IHubContext&lt;TagHub&gt; hub) =&gt;
+{
+    store.Apply(batch);
+    <span class="k">var</span> fired = alarms.Evaluate(batch.Values);
+
+    <span class="k">await</span> hub.Clients.All.SendAsync(<span class="s">"tags"</span>, batch.Values);
+    <span class="k">if</span> (fired.Count &gt; 0)
+        <span class="k">await</span> hub.Clients.All.SendAsync(<span class="s">"alarms"</span>, fired);
+
+    <span class="k">return</span> Results.Ok(<span class="k">new</span> { received = batch.Values.Count });
+});</pre>
+        <ul class="bullet" style="margin-top:12px">
+          <li>ASP.NET Core Minimal API + SignalR 실시간 푸시</li>
+          <li>ISA-18.2 알람 엔진 (우선순위 · 데드밴드 · 셸빙 · 상태기반 억제)</li>
+          <li>히스토리안 적재 및 조회 API</li>
+          <li>ONVIF/RTSP → WebRTC 중계 세션 관리</li>
+        </ul>
+      </div>
+    </div>
+
+    <div style="margin-top:26px">
+      <h3 style="font-size:15px;margin:0 0 10px">빌드</h3>
+      <pre class="code"><span class="c"># C++ 수집기</span>
+cd src/collector &amp;&amp; cmake -B build &amp;&amp; cmake --build build --config Release
+
+<span class="c"># C# 게이트웨이</span>
+cd src/SHFms.Server &amp;&amp; dotnet run</pre>
+    </div>
+  </div>
+</section>
+
+<section id="screen">
+  <div class="wrap">
+    <h2>화면 구성</h2>
+    <p class="lead">총 8개 관제 화면. ISA-101 화면 계층에 따라 메뉴가 묶여 있습니다.</p>
+    <table class="spec">
+      <tr><th style="width:80px">계층</th><th style="width:170px">화면명</th><th>주요 기능</th><th style="width:110px">경로</th></tr>
+      <tr><td>Level 1</td><td>공장 전체 감시</td><td>동별 가동상태, 핵심 공정값 18종, 알람 요약, 생산 진척</td><td><code>overview</code></td></tr>
+      <tr><td>Level 2</td><td>라인 공정 미믹</td><td>설비 배치도 + 공정 흐름 + 실시간 태그값 오버레이</td><td><code>line</code></td></tr>
+      <tr><td>Level 2</td><td>화학 배치 공정</td><td>반응기 온도·압력·교반·레벨, 페이즈 진행, 자켓 온도</td><td><code>chemical</code></td></tr>
+      <tr><td>Level 2</td><td>에너지 · 유틸리티</td><td>전력·스팀·용수 사용량, 구역별 원단위, 피크 관리, 탄소배출</td><td><code>energy</code></td></tr>
+      <tr><td>Level 3</td><td>CCTV 통합관제</td><td>1/4/9분할, PTZ 제어, AI 영상분석 이벤트, 녹화 상태</td><td><code>cctv</code></td></tr>
+      <tr><td>Level 3</td><td>안전 관제</td><td>구역별 위험요인·가스·화재·재실인원, 작업허가, 점검 이력</td><td><code>safety</code></td></tr>
+      <tr><td>Level 4</td><td>알람 관리</td><td>활성 알람, ACK/셸빙, 알람 부하 KPI, 빈발 알람 분석</td><td><code>alarm</code></td></tr>
+      <tr><td>Level 4</td><td>트렌드 · 히스토리안</td><td>태그 다중 선택 트렌드, 기간 조회, 통계, 데이터 내보내기</td><td><code>trend</code></td></tr>
+    </table>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <div>SH-FMS v3.2 · 자동화공장 통합 모니터링 · 제어기술팀</div>
+    <div>문서: SH-FMS-WI-2026-001 / 최종 개정 2026-09-21</div>
+  </div>
+</footer>
+
+</body>
+</html>
