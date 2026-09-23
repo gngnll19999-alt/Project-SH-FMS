@@ -1,0 +1,102 @@
+/* SH-FMS 인트로. 관제 화면과 같은 다크 톤이되, 소개 페이지라 색을 조금 더 허용했다. */
+
+:root {
+  --bg: #090c11;
+  --bg2: #0e131a;
+  --panel: #121820;
+  --line: #212a35;
+  --txt: #ccd3dc;
+  --dim: #78828f;
+  --accent: #35c0d6;
+  --accent2: #5fd6e8;
+}
+
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--bg); color: var(--txt);
+  font-family: "Malgun Gothic", "맑은 고딕", -apple-system, "Segoe UI", sans-serif;
+  font-size: 15px; line-height: 1.75;
+}
+a { color: inherit; text-decoration: none; }
+.wrap { max-width: 1100px; margin: 0 auto; padding: 0 24px; }
+
+.nav { position: sticky; top: 0; z-index: 20; background: rgba(9,12,17,.93); border-bottom: 1px solid var(--line); backdrop-filter: blur(6px); }
+.nav .wrap { display: flex; align-items: center; height: 60px; gap: 26px; }
+.logo { display: flex; align-items: center; gap: 10px; }
+.logo .mk { width: 26px; height: 26px; border: 2px solid var(--accent); border-radius: 50%; position: relative; }
+.logo .mk::after { content: ""; position: absolute; left: 6px; top: 6px; width: 10px; height: 10px; border-radius: 50%; background: var(--accent); }
+.logo b { font-size: 16px; letter-spacing: .4px; }
+.logo span { font-size: 11px; color: var(--dim); }
+.nav .menu { display: flex; gap: 22px; margin-left: auto; font-size: 13.5px; color: var(--dim); }
+.nav .menu a:hover { color: var(--txt); }
+.nav .go { background: var(--accent); color: #04222a; padding: 7px 16px; border-radius: 3px; font-size: 13px; font-weight: 700; }
+.nav .go:hover { background: var(--accent2); }
+
+.hero {
+  padding: 74px 0 60px; border-bottom: 1px solid var(--line);
+  background: radial-gradient(880px 400px at 80% -12%, rgba(53,192,214,.14), transparent 60%), linear-gradient(180deg, #0d141c, var(--bg));
+}
+.hero .tag {
+  display: inline-block; font-size: 12px; color: var(--accent2);
+  border: 1px solid rgba(53,192,214,.36); border-radius: 20px; padding: 3px 12px; margin-bottom: 20px;
+}
+.hero h1 { font-size: 39px; line-height: 1.33; margin: 0 0 18px; letter-spacing: -1px; }
+.hero h1 em { font-style: normal; color: var(--accent2); }
+.hero p { color: var(--dim); max-width: 680px; margin: 0 0 30px; }
+.btns { display: flex; gap: 10px; flex-wrap: wrap; }
+.btn { display: inline-block; padding: 11px 22px; border-radius: 3px; font-size: 14px; border: 1px solid var(--line); }
+.btn:hover { border-color: var(--accent); }
+.btn.pri { background: var(--accent); border-color: var(--accent); color: #04222a; font-weight: 700; }
+.btn.pri:hover { background: var(--accent2); }
+
+.facts { display: flex; gap: 46px; margin-top: 46px; flex-wrap: wrap; }
+.facts div b { display: block; font-size: 27px; color: var(--accent2); font-family: Consolas, monospace; }
+.facts div span { font-size: 12.5px; color: var(--dim); }
+
+section { padding: 60px 0; border-bottom: 1px solid var(--line); }
+section.alt { background: var(--bg2); }
+section h2 { font-size: 24px; margin: 0 0 8px; letter-spacing: -.5px; }
+section .lead { color: var(--dim); margin: 0 0 32px; font-size: 14px; }
+
+.cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 13px; }
+@media (max-width: 900px) { .cards { grid-template-columns: 1fr; } }
+.cards .c { background: var(--panel); border: 1px solid var(--line); border-radius: 4px; padding: 19px; }
+.cards .c .n { font-family: Consolas, monospace; font-size: 11px; color: var(--accent); }
+.cards .c h3 { font-size: 15px; margin: 6px 0 8px; }
+.cards .c p { font-size: 13px; color: var(--dim); margin: 0; line-height: 1.75; }
+.cards .c .std { margin-top: 12px; font-size: 11px; color: #5d6a7a; border-top: 1px solid var(--line); padding-top: 9px; }
+
+/* 스택 다이어그램 */
+.stack { display: grid; gap: 7px; }
+.lv { display: grid; grid-template-columns: 96px 1fr; border: 1px solid var(--line); border-radius: 4px; background: var(--panel); overflow: hidden; }
+.lv .l { background: #0d131a; padding: 14px 10px; display: grid; place-items: center; font-family: Consolas, monospace; font-size: 11.5px; color: var(--dim); border-right: 1px solid var(--line); }
+.lv .r { padding: 13px 16px; }
+.lv .r b { font-size: 14px; }
+.lv .r span { display: block; font-size: 12.5px; color: var(--dim); margin-top: 2px; }
+.lv.me { border-color: rgba(53,192,214,.5); background: #0d1c20; }
+.lv.me .l { color: var(--accent2); background: #0a181c; }
+
+table.spec { width: 100%; border-collapse: collapse; font-size: 13px; }
+table.spec th, table.spec td { padding: 9px 12px; border-bottom: 1px solid var(--line); text-align: left; }
+table.spec th { color: var(--dim); font-weight: 600; font-size: 12px; background: var(--bg2); }
+table.spec td code { font-family: Consolas, monospace; color: var(--accent2); font-size: 12px; }
+
+.bullet { list-style: none; padding: 0; margin: 0; }
+.bullet li { padding: 7px 0 7px 20px; position: relative; font-size: 13.5px; color: var(--dim); }
+.bullet li::before { content: "—"; position: absolute; left: 0; color: var(--accent); }
+.bullet li b { color: var(--txt); }
+
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 36px; }
+@media (max-width: 860px) { .two { grid-template-columns: 1fr; } }
+
+pre.code {
+  background: #0b1016; border: 1px solid var(--line); border-radius: 4px;
+  padding: 14px 16px; font-family: Consolas, monospace; font-size: 12px;
+  color: #a9b6c6; overflow-x: auto; line-height: 1.7;
+}
+pre.code .k { color: #6fb3d8; }
+pre.code .s { color: #9bd09b; }
+pre.code .c { color: #5d6a7a; }
+
+footer { padding: 32px 0 50px; color: #5d6a7a; font-size: 12px; }
+footer .wrap { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 10px; }
