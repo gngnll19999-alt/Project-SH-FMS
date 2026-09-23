@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>에너지 · 유틸리티 · SH-FMS</title>
+<link rel="stylesheet" href="../assets/css/app.css">
+</head>
+<body data-page="energy" data-title="에너지 · 유틸리티" data-crumb="FEMS" data-lvl="ISA-101 LEVEL 2">
+
+<div class="filters">
+  <label>기간</label>
+  <select id="f-period"><option>금일</option><option>금주</option><option>당월</option></select>
+  <label>에너지원</label>
+  <select id="f-src"><option>전력</option><option>스팀</option><option>용수</option><option>전체</option></select>
+  <label>구역</label>
+  <select><option>전체</option><option>A동</option><option>B동</option><option>C동</option><option>D동</option></select>
+  <button class="btn pri" id="f-go">조회</button>
+  <div style="flex:1"></div>
+  <button class="btn" onclick="alert('원단위 리포트\n\n· 제품 단위당 전력/스팀/용수 사용량\n· 전월 대비 증감\n· 목표 대비 달성률\n\n월간 에너지 회의 보고 양식으로 생성됩니다.')">원단위 리포트</button>
+  <button class="btn" onclick="alert('온실가스 배출량 산정\n\nIPCC 가이드라인 기준으로 전력/스팀 사용량을 CO2e 로 환산합니다.\n배출권 보고용 자료로 사용됩니다.')">배출량 산정</button>
+</div>
+
+<div class="grid g6" style="margin-bottom:10px" id="kpi"></div>
+
+<div class="grid" style="grid-template-columns:1fr 340px;margin-bottom:10px">
+  <div class="card">
+    <header>
+      <h2>시간대별 사용량</h2><span class="sub">금일 00:00 ~ 현재</span>
+      <div class="spacer"></div>
+      <div class="legend">
+        <span><i style="background:#7f93ab"></i>전력 kW</span>
+        <span><i style="background:#d6a02c"></i>피크 기준</span>
+      </div>
+    </header>
+    <div class="body">
+      <div id="ch-pw"></div>
+      <div style="margin-top:8px"><div id="ch-stm"></div></div>
+      <div class="note" id="peak-note"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <header><h2>실시간 유틸리티</h2><span class="sub">공급 상태</span></header>
+    <div class="body tight">
+      <table class="tb"><tbody id="utl-tb"></tbody></table>
+      <div style="padding:11px 12px">
+        <div class="dim" style="font-size:10.5px;margin-bottom:6px">역률 / 수전 전압</div>
+        <table class="tb">
+          <tr><td class="dim">역률</td><td class="num">0.94</td><td class="dim">기준 0.90 이상</td></tr>
+          <tr><td class="dim">수전 전압</td><td class="num">22,780</td><td class="dim">V (22.9kV)</td></tr>
+          <tr><td class="dim">최대수요전력</td><td class="num">1,412</td><td class="dim">kW (계약 1,600)</td></tr>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="grid g2" style="margin-bottom:10px">
+  <div class="card">
+    <header><h2>구역별 전력 사용량</h2><span class="sub">금일 · kWh</span></header>
+    <div class="body">
+      <div id="ch-area"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <header><h2>구역별 상세</h2><span class="sub">전일 대비 · 원단위</span></header>
+    <div class="body tight">
+      <table class="tb">
+        <thead><tr><th>구역</th><th class="num">사용량</th><th class="num">비중</th><th class="num">전일</th><th class="num">증감</th><th class="num">원단위</th><th style="width:110px">추이</th></tr></thead>
+        <tbody id="area-tb"></tbody>
+        <tfoot><tr id="area-tf"></tr></tfoot>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div class="grid g3">
+  <div class="card">
+    <header><h2>온실가스 배출량</h2><span class="sub">당월 누계 · tCO2e</span></header>
+    <div class="body">
+      <div id="ch-co2" style="display:flex;justify-content:center"></div>
+      <table class="tb" style="margin-top:8px" id="co2-tb"></table>
+    </div>
+  </div>
+
+  <div class="card">
+    <header><h2>피크 전력 관리</h2><span class="sub">15분 수요전력</span></header>
+    <div class="body">
+      <div id="ch-peak"></div>
+      <div class="note">계약전력 1,600kW 의 90%(1,440kW) 도달 시 경고가 발생하고, 우선순위가 낮은 부하(공조·조명)부터 순차 제어 대상으로 표시됩니다.</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <header><h2>절감 과제</h2><span class="sub">진행 현황</span></header>
+    <div class="body tight">
+      <table class="tb">
+        <thead><tr><th>과제</th><th>대상</th><th class="num">절감</th><th>상태</th></tr></thead>
+        <tbody id="save-tb"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script src="../assets/js/auth.js"></script>
+<script src="../assets/js/mock.js"></script>
+<script src="../assets/js/chart.js"></script>
+<script src="../assets/js/shell.js"></script>
+<script>
+(function () {
+  var en = Mock.energy();
+  var areas = Mock.energyByArea();
+  var totPw = en.power.reduce(function (a, b) { return a + b; }, 0);
+  var totStm = en.steam.reduce(function (a, b) { return a + b; }, 0);
+  var totWtr = en.water.reduce(function (a, b) { return a + b; }, 0);
+  var peak = Math.max.apply(null, en.power);
+
+  document.getElementById('kpi').innerHTML = [
+    { t: 'PWR_TOT', l: '금일 전력', v: (totPw / 1000).toFixed(1), u: 'MWh', c: '' },
+    { t: 'PWR_NOW', l: '순간 전력', v: en.power[new Date().getHours()] || en.power[12], u: 'kW', c: '' },
+    { t: 'PWR_PEAK', l: '최대수요', v: peak.toLocaleString(), u: 'kW', c: peak > 1440 ? 'warn' : '' },
+    { t: 'STM_TOT', l: '스팀', v: totStm.toFixed(1), u: 't', c: '' },
+    { t: 'WTR_TOT', l: '용수', v: totWtr, u: 'm³', c: '' },
+    { t: 'CO2_MTD', l: '당월 배출', v: '284', u: 'tCO2e', c: '' }
+  ].map(function (k) {
+    return '<div class="pv ' + k.c + '"><div class="lip"></div>' +
+      '<div class="tag">' + k.t + '</div><div class="lbl">' + k.l + '</div>' +
+      '<div class="val">' + k.v + '<small>' + k.u + '</small></div></div>';
+  }).join('');
+
+  Chart.line(document.getElementById('ch-pw'), {
+    labels: en.hours, h: 176, area: true,
+    series: [{ name: '전력', color: '#7f93ab', data: en.power }],
+    refs: [{ v: 1440, color: '#d6a02c', label: '피크 경고 1,440kW' }]
+  });
+  Chart.bars(document.getElementById('ch-stm'), {
+    labels: en.hours, data: en.steam, h: 96,
+    colors: en.steam.map(function () { return '#5f8a76'; })
+  });
+
+  var overH = en.power.filter(function (v) { return v > 1200; }).length;
+  document.getElementById('peak-note').innerHTML =
+    '금일 최대수요 <b>' + peak.toLocaleString() + 'kW</b> (계약 1,600kW 대비 ' + (peak / 1600 * 100).toFixed(0) + '%) · ' +
+    '1,200kW 초과 구간 <b>' + overH + '시간</b>. 코팅 2라인 재가동 시 피크 재산정이 필요합니다.';
+
+  // 유틸리티 실시간
+  var UT = ['UTL_AIR701', 'UTL_CHW702', 'UTL_STM703'];
+  function drawUtl() {
+    document.getElementById('utl-tb').innerHTML = UT.map(function (tg) {
+      var t = Mock.tag(tg), s = Mock.tagState(t);
+      var col = s === 'alarm' ? 'var(--bad)' : s === 'warn' ? 'var(--warn)' : 'var(--txt)';
+      return '<tr><td class="dim" style="width:110px">' + t.desc + '</td>' +
+        '<td class="num" style="color:' + col + ';font-weight:600">' + t.pv.toFixed(2) + '</td>' +
+        '<td class="dim" style="width:36px">' + t.unit + '</td>' +
+        '<td class="dim" style="font-size:10px">L' + t.lo + '/H' + t.hi + '</td></tr>';
+    }).join('');
+  }
+  drawUtl();
+  Mock.onTick(drawUtl);
+  Mock.start(2000);
+
+  // 구역별
+  Chart.bars(document.getElementById('ch-area'), {
+    labels: areas.map(function (a) { return a.area; }),
+    data: areas.map(function (a) { return a.pw; }),
+    colors: areas.map(function (a) { return a.pw > a.prev ? '#8a7a4a' : '#4a5666'; }),
+    h: 196, showValue: true
+  });
+
+  var tot = areas.reduce(function (a, b) { return a + b.pw; }, 0);
+  document.getElementById('area-tb').innerHTML = areas.map(function (a, i) {
+    var diff = (a.pw - a.prev) / a.prev * 100;
+    return '<tr><td><b>' + a.area + '</b></td>' +
+      '<td class="num">' + a.pw.toLocaleString() + '</td>' +
+      '<td class="num dim">' + a.ratio.toFixed(1) + '%</td>' +
+      '<td class="num dim">' + a.prev.toLocaleString() + '</td>' +
+      '<td class="num" style="color:' + (diff > 5 ? 'var(--warn)' : diff < 0 ? 'var(--ok)' : 'var(--txt)') + '">' +
+        (diff > 0 ? '+' : '') + diff.toFixed(1) + '%</td>' +
+      '<td class="num dim">' + (a.unit ? a.unit.toFixed(3) : '-') + '</td>' +
+      '<td><span class="sp' + i + '"></span></td></tr>';
+  }).join('');
+  areas.forEach(function (a, i) {
+    var d = [], v = a.prev;
+    for (var k = 0; k < 10; k++) { v = v + (Math.sin(k * 1.3 + i) * a.prev * 0.04); d.push(Math.round(v)); }
+    d.push(a.pw);
+    Chart.spark(document.querySelector('.sp' + i), d, a.pw > a.prev ? '#8a7a4a' : '#5f8a76');
+  });
+  document.getElementById('area-tf').innerHTML =
+    '<td>합계</td><td class="num">' + tot.toLocaleString() + '</td><td class="num">100.0%</td>' +
+    '<td class="num">' + areas.reduce(function (a, b) { return a + b.prev; }, 0).toLocaleString() + '</td>' +
+    '<td colspan="3"></td>';
+
+  // CO2
+  var CO2 = [
+    { n: '전력 (간접)', v: 198, c: '#5f7d99' },
+    { n: '스팀 (직접)', v: 64, c: '#5f8a76' },
+    { n: '기타 연료', v: 22, c: '#8a7a4a' }
+  ];
+  Chart.donut(document.getElementById('ch-co2'), CO2.map(function (c) { return { value: c.v, color: c.c }; }),
+    { size: 150, center: '284', centerSub: 'tCO2e' });
+  document.getElementById('co2-tb').innerHTML = CO2.map(function (c) {
+    return '<tr><td><i style="display:inline-block;width:9px;height:9px;border-radius:2px;background:' + c.c +
+      ';margin-right:6px"></i>' + c.n + '</td><td class="num">' + c.v + '</td>' +
+      '<td class="num dim">' + (c.v / 284 * 100).toFixed(1) + '%</td></tr>';
+  }).join('');
+
+  // 피크 (15분 단위 최근 4시간)
+  var pk = [], pl = [];
+  for (var i = 0; i < 16; i++) {
+    pl.push(String(i * 15 % 60 === 0 ? Math.floor(i / 4) + 'h' : ''));
+    pk.push(1080 + Math.round(Math.sin(i * 0.6) * 180 + (i > 11 ? 120 : 0)));
+  }
+  Chart.line(document.getElementById('ch-peak'), {
+    labels: pl, h: 176, min: 800, max: 1650,
+    series: [{ name: '수요전력', color: '#7f93ab', data: pk, dots: true }],
+    refs: [
+      { v: 1600, color: '#d6483c', label: '계약 1,600' },
+      { v: 1440, color: '#d6a02c', label: '경고 1,440' }
+    ]
+  });
+
+  var SAVE = [
+    { n: '건조로 배기 폐열 회수', t: 'B동', s: '-42 MWh/월', st: '진행' },
+    { n: '컴프레서 대수제어 최적화', t: '유틸', s: '-18 MWh/월', st: '완료' },
+    { n: 'LED 조명 교체', t: 'C·D동', s: '-11 MWh/월', st: '완료' },
+    { n: '인버터 적용 (냉각수 펌프)', t: '유틸', s: '-26 MWh/월', st: '검토' },
+    { n: '스팀 트랩 정비', t: 'A동', s: '-3.2 t/월', st: '진행' }
+  ];
+  document.getElementById('save-tb').innerHTML = SAVE.map(function (s) {
+    var c = s.st === '완료' ? 'st-run' : s.st === '진행' ? 'st-warn' : 'st-idle';
+    return '<tr><td style="white-space:normal">' + s.n + '</td><td class="dim">' + s.t + '</td>' +
+      '<td class="num" style="color:var(--ok)">' + s.s + '</td>' +
+      '<td><span class="st ' + c + '">' + s.st + '</span></td></tr>';
+  }).join('');
+})();
+</script>
+</body>
+</html>

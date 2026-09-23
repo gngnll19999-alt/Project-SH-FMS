@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>안전 관제 · SH-FMS</title>
+<link rel="stylesheet" href="../assets/css/app.css">
+<style>
+  .zone {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 3px;
+    padding: 11px 12px; position: relative;
+  }
+  .zone .lip { position: absolute; left: 0; top: 0; bottom: 0; width: 2px; background: #333c48; }
+  .zone.warn { border-color: rgba(214,160,44,.4); }
+  .zone.warn .lip { background: var(--warn); }
+  .zone.bad { border-color: rgba(214,72,60,.45); background: #1a1417; }
+  .zone.bad .lip { background: var(--bad); }
+  .zone .h { display: flex; align-items: center; gap: 7px; margin-bottom: 7px; }
+  .zone .h b { font-size: 12.5px; }
+  .zone .risk { font-size: 10.5px; color: var(--dim); }
+  .zone .row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-top: 8px; }
+  .zone .row div { background: #10151c; border: 1px solid var(--line); border-radius: 2px; padding: 5px 7px; text-align: center; }
+  .zone .row .l { font-size: 9.5px; color: var(--dim); }
+  .zone .row .v { font-size: 13px; font-family: var(--mono); }
+</style>
+</head>
+<body data-page="safety" data-title="안전 관제" data-crumb="중대재해처벌법 대응" data-lvl="ISA-101 LEVEL 3">
+
+<div class="grid g5" style="margin-bottom:10px" id="kpi"></div>
+
+<div class="card" style="margin-bottom:10px">
+  <header>
+    <h2>구역별 안전 현황</h2><span class="sub">실시간 재실인원 · 가스 · 화재</span>
+    <div class="spacer"></div>
+    <div class="legend">
+      <span><i style="background:#333c48"></i>정상</span>
+      <span><i style="background:#d6a02c"></i>주의</span>
+      <span><i style="background:#d6483c"></i>조치 필요</span>
+    </div>
+  </header>
+  <div class="body">
+    <div class="grid g3" id="zones"></div>
+    <div class="note">재실인원은 출입통제 시스템(카드 태깅)과 CCTV 영상분석 결과를 합산해 산출합니다. 비상 시 대피 확인에 사용됩니다.</div>
+  </div>
+</div>
+
+<div class="grid" style="grid-template-columns:1fr 1fr;margin-bottom:10px">
+  <div class="card">
+    <header><h2>안전 이벤트</h2><span class="sub">금일 · CCTV AI 분석 + 센서</span></header>
+    <div class="body tight" style="max-height:270px;overflow-y:auto">
+      <table class="tb">
+        <thead><tr><th style="width:56px">시각</th><th style="width:60px">구역</th><th style="width:100px">유형</th><th>내용</th><th style="width:74px">처리</th></tr></thead>
+        <tbody id="ev-tb"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card">
+    <header><h2>작업허가서 (PTW)</h2><span class="sub">진행 중인 위험작업</span>
+      <div class="spacer"></div>
+      <button class="btn sm" onclick="alert('작업허가서 신규 발급\n\n유형 : 화기작업 / 밀폐공간 / 고소작업 / 정전작업\n\n발급 시 해당 구역 CCTV 가 자동으로 관제 화면에 표출되고,\n작업 종료 시까지 감시 대상으로 유지됩니다.')">신규 발급</button>
+    </header>
+    <div class="body tight">
+      <table class="tb">
+        <thead><tr><th style="width:100px">허가번호</th><th>작업 내용</th><th style="width:76px">구역</th><th style="width:66px">인원</th><th style="width:110px">시간</th><th style="width:66px">상태</th></tr></thead>
+        <tbody id="ptw-tb"></tbody>
+      </table>
+      <div class="note" style="margin:10px 12px">
+        밀폐공간 작업은 산소농도 측정값이 18% 미만이면 시스템이 자동으로 작업중지 알람을 발생시킵니다.
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="grid" style="grid-template-columns:1fr 340px">
+  <div class="card">
+    <header><h2>안전보건 점검 이력</h2><span class="sub">법정 의무 항목</span></header>
+    <div class="body tight">
+      <table class="tb">
+        <thead><tr><th>점검 항목</th><th style="width:90px">주기</th><th style="width:100px">최종 실시</th><th style="width:100px">차기 예정</th><th style="width:80px">상태</th><th style="width:110px">담당</th></tr></thead>
+        <tbody id="chk-tb"></tbody>
+      </table>
+      <div class="note" style="margin:10px 12px">
+        경과 항목은 중대재해처벌법상 안전보건 확보의무 이행 점검에서 지적 대상이 됩니다. 기한 7일 전 담당자에게 알림이 발송됩니다.
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <header><h2>가스 검지기</h2><span class="sub">실시간</span></header>
+    <div class="body tight">
+      <table class="tb"><tbody id="gas-tb"></tbody></table>
+      <div style="padding:11px 12px">
+        <div class="dim" style="font-size:10.5px;margin-bottom:6px">A동 VOC 농도 추이 (최근 2시간)</div>
+        <div id="ch-gas"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="../assets/js/auth.js"></script>
+<script src="../assets/js/mock.js"></script>
+<script src="../assets/js/chart.js"></script>
+<script src="../assets/js/shell.js"></script>
+<script>
+(function () {
+  var S = Mock.safety();
+
+  document.getElementById('kpi').innerHTML = [
+    { t: 'SAF_DAYS', l: '무재해 일수', v: S.kpi.days, u: '일', c: '' },
+    { t: 'SAF_NEAR', l: '아차사고 (당월)', v: S.kpi.near, u: '건', c: 'warn' },
+    { t: 'SAF_PTW',  l: '진행 작업허가', v: S.kpi.ptw, u: '건', c: 'act' },
+    { t: 'SAF_PPE',  l: '보호구 미착용 (금일)', v: S.kpi.ppe, u: '건', c: 'warn' },
+    { t: 'SAF_PPL',  l: '현재 재실인원', v: S.zones.reduce(function (a, z) { return a + z.people; }, 0), u: '명', c: '' }
+  ].map(function (k) {
+    return '<div class="pv ' + k.c + '"><div class="lip"></div>' +
+      '<div class="tag">' + k.t + '</div><div class="lbl">' + k.l + '</div>' +
+      '<div class="val">' + k.v + '<small>' + k.u + '</small></div></div>';
+  }).join('');
+
+  document.getElementById('zones').innerHTML = S.zones.map(function (z) {
+    var badge = z.st === 'bad' ? '<span class="st st-stop">조치 필요</span>'
+              : z.st === 'warn' ? '<span class="st st-warn">주의</span>'
+              : '<span class="st st-run">정상</span>';
+    return '<div class="zone ' + (z.st === 'ok' ? '' : z.st) + '"><div class="lip"></div>' +
+      '<div class="h"><b>' + z.z + '</b><span style="flex:1"></span>' + badge + '</div>' +
+      '<div class="risk">위험요인 · ' + z.risk + '</div>' +
+      '<div class="row">' +
+        '<div><div class="l">재실인원</div><div class="v">' + z.people + '</div></div>' +
+        '<div><div class="l">가스</div><div class="v" style="color:' + (z.gas === '정상' ? 'inherit' : 'var(--warn)') + ';font-size:11px">' + z.gas + '</div></div>' +
+        '<div><div class="l">화재</div><div class="v" style="font-size:11px">' + z.fire + '</div></div>' +
+      '</div></div>';
+  }).join('');
+
+  var EV = [
+    { m: 2,  z: 'C동', t: '위험구역 진입', d: '프레스 구역 안전펜스 내부 인원 감지 (CAM-06)', lv: 'bad', s: '확인중' },
+    { m: 9,  z: 'A동', t: '보호구 미착용', d: '원료 투입구 안전모 미착용 1명 (CAM-02)', lv: 'warn', s: '계도' },
+    { m: 17, z: 'D동', t: '지게차 근접',   d: '출하장 보행자 2.1m 근접 경보', lv: 'warn', s: '조치완료' },
+    { m: 34, z: 'B동', t: 'VOC 상승',      d: 'A동 VOC 18.4ppm — 환기 강화', lv: 'warn', s: '조치완료' },
+    { m: 48, z: '유틸', t: '야간 출입',    d: '위험물 저장소 출입 — 사전승인 확인됨', lv: 'info', s: '정상' },
+    { m: 62, z: 'B동', t: '연기 감지',     d: '코팅2 건조로 증기 — 오탐 처리', lv: 'info', s: '종결' },
+    { m: 96, z: 'C동', t: '비상정지 작동', d: '조립 1라인 E-Stop 작동 (오조작)', lv: 'warn', s: '복구완료' },
+    { m: 142, z: 'A동', t: '보호구 미착용', d: '배합실 보안경 미착용 1명', lv: 'warn', s: '계도' }
+  ];
+  var lvC = { bad: 'var(--bad)', warn: 'var(--warn)', info: 'var(--dim)' };
+  document.getElementById('ev-tb').innerHTML = EV.map(function (e) {
+    return '<tr' + (e.lv === 'bad' ? ' class="p1"' : '') + '>' +
+      '<td class="dim">' + Mock.hms(new Date(Date.now() - e.m * 60000)) + '</td>' +
+      '<td class="dim">' + e.z + '</td>' +
+      '<td style="color:' + lvC[e.lv] + '">' + e.t + '</td>' +
+      '<td style="white-space:normal">' + e.d + '</td>' +
+      '<td><span class="st ' + (e.s === '확인중' ? 'st-stop' : e.s === '계도' ? 'st-warn' : 'st-run') + '">' + e.s + '</span></td></tr>';
+  }).join('');
+
+  var PTW = [
+    { no: 'PTW-260923-03', w: '폐수처리조 내부 청소', z: '폐수처리장', p: '1명', t: '09:00 ~ 12:00', s: '진행', k: '밀폐공간' },
+    { no: 'PTW-260923-02', w: 'CT-02 건조로 배관 용접', z: 'B동', p: '2명', t: '13:30 ~ 17:00', s: '대기', k: '화기작업' },
+    { no: 'PTW-260923-01', w: '천장 크레인 레일 점검', z: 'C동', p: '2명', t: '08:00 ~ 10:30', s: '완료', k: '고소작업' }
+  ];
+  document.getElementById('ptw-tb').innerHTML = PTW.map(function (p) {
+    var c = p.s === '진행' ? 'st-warn' : p.s === '대기' ? 'st-idle' : 'st-run';
+    return '<tr><td class="tag">' + p.no + '</td>' +
+      '<td style="white-space:normal">' + p.w + '<div class="dim" style="font-size:10px">' + p.k + '</div></td>' +
+      '<td class="dim">' + p.z + '</td><td class="dim">' + p.p + '</td><td class="dim">' + p.t + '</td>' +
+      '<td><span class="st ' + c + '">' + p.s + '</span></td></tr>';
+  }).join('');
+
+  var OWNER = ['안전관리자 조현탁', '안전관리자 조현탁', '시설팀 남기훈', '안전관리자 조현탁', '제어기술팀 김현우', '안전보건팀'];
+  document.getElementById('chk-tb').innerHTML = S.checks.map(function (c, i) {
+    var cls = c.st === '경과' ? 'st-stop' : c.st === '예정' ? 'st-warn' : 'st-run';
+    return '<tr' + (c.st === '경과' ? ' class="p1"' : '') + '>' +
+      '<td>' + c.n + '</td><td class="dim">' + c.cyc + '</td>' +
+      '<td>' + c.last + '</td>' +
+      '<td' + (c.st === '경과' ? ' style="color:var(--bad);font-weight:700"' : '') + '>' + c.next + '</td>' +
+      '<td><span class="st ' + cls + '">' + c.st + '</span></td>' +
+      '<td class="dim">' + OWNER[i] + '</td></tr>';
+  }).join('');
+
+  var GAS = ['ENV_VOC801', 'ENV_O2802'];
+  function drawGas() {
+    document.getElementById('gas-tb').innerHTML = GAS.map(function (tg) {
+      var t = Mock.tag(tg), s = Mock.tagState(t);
+      var col = s === 'alarm' ? 'var(--bad)' : s === 'warn' ? 'var(--warn)' : 'var(--txt)';
+      return '<tr><td class="dim" style="width:108px">' + t.desc + '</td>' +
+        '<td class="num" style="color:' + col + ';font-weight:600">' + t.pv.toFixed(1) + '</td>' +
+        '<td class="dim" style="width:36px">' + t.unit + '</td>' +
+        '<td class="dim" style="font-size:10px">경보 ' + t.hiHi + '</td></tr>';
+    }).join('') +
+    '<tr><td class="dim">C동 CO 농도</td><td class="num">4.2</td><td class="dim">ppm</td><td class="dim" style="font-size:10px">경보 30</td></tr>' +
+    '<tr><td class="dim">유틸 LEL</td><td class="num">0.0</td><td class="dim">%</td><td class="dim" style="font-size:10px">경보 25</td></tr>';
+  }
+  drawGas();
+  Mock.onTick(drawGas);
+  Mock.start(2000);
+
+  var h = Mock.history('ENV_VOC801', 60);
+  Chart.line(document.getElementById('ch-gas'), {
+    labels: h.labels, h: 120, min: 0, max: 60,
+    series: [{ name: 'VOC', color: '#8a7a4a', data: h.data }],
+    refs: [{ v: 50, color: '#d6a02c', label: 'H 50ppm' }]
+  });
+})();
+</script>
+</body>
+</html>

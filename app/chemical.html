@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>화학 배치 공정 · SH-FMS</title>
+<link rel="stylesheet" href="../assets/css/app.css">
+<style>
+  .rx { background: var(--panel); border: 1px solid var(--line); border-radius: 3px; }
+  .rx > header { padding: 9px 12px; border-bottom: 1px solid var(--line); display: flex; align-items: center; gap: 8px; }
+  .rx > header b { font-size: 13px; }
+  .rx .body { padding: 12px; display: grid; grid-template-columns: 150px 1fr; gap: 14px; }
+  .vessel { position: relative; }
+  .vessel svg { width: 100%; display: block; }
+  .phase { display: flex; gap: 2px; margin-bottom: 10px; }
+  .phase div {
+    flex: 1; text-align: center; font-size: 9.5px; padding: 5px 1px;
+    background: #151b23; color: #6e7885; border-top: 2px solid #2a323d;
+  }
+  .phase div.done { color: #74b985; border-top-color: #4f9e63; }
+  .phase div.on { color: #c9cfd8; border-top-color: #5f7d99; background: #18202a; font-weight: 700; }
+  .pvrow { display: grid; grid-template-columns: repeat(4, 1fr); gap: 7px; }
+  .pvmini { background: #10151c; border: 1px solid var(--line); border-radius: 2px; padding: 7px 9px; }
+  .pvmini .l { font-size: 9.5px; color: var(--dim); }
+  .pvmini .v { font-size: 17px; font-family: var(--mono); }
+  .pvmini .s { font-size: 9.5px; color: var(--dim); font-family: var(--mono); }
+  .pvmini.warn { border-color: rgba(214,160,44,.4); }
+  .pvmini.warn .v { color: #e0b658; }
+  .pvmini.alarm { border-color: rgba(214,72,60,.45); }
+  .pvmini.alarm .v { color: #e57b71; }
+</style>
+</head>
+<body data-page="chemical" data-title="화학 배치 공정" data-crumb="A동 배합 라인" data-lvl="ISA-101 LEVEL 2">
+
+<div class="filters">
+  <label>반응기</label>
+  <select><option>전체</option><option>R-101 배합 1호기</option><option>R-201 배합 2호기</option></select>
+  <label>표시</label>
+  <select><option>실시간</option><option>배치 종료분 포함</option></select>
+  <button class="btn pri">조회</button>
+  <div style="flex:1"></div>
+  <span class="dim" style="font-size:11px">배치 실행 제어는 MES 배치 화면에서 수행합니다. 본 화면은 감시 전용입니다.</span>
+</div>
+
+<div class="grid g2" style="margin-bottom:10px" id="rxs"></div>
+
+<div class="grid" style="grid-template-columns:1fr 340px;margin-bottom:10px">
+  <div class="card">
+    <header>
+      <h2>배치 트렌드</h2><span class="sub" id="tr-sub">R-201 · BT-260923-004</span>
+      <div class="spacer"></div>
+      <div class="legend">
+        <span><i style="background:#8fa8c0"></i>반응조 온도</span>
+        <span><i style="background:#d6a02c"></i>설정값</span>
+        <span><i style="background:#5f8a76"></i>자켓 온도</span>
+      </div>
+    </header>
+    <div class="body">
+      <div id="ch-t"></div>
+      <div style="margin-top:8px"><div id="ch-p"></div></div>
+      <div class="note">반응조 온도가 설정값 대비 ±2℃를 벗어나면 P2 알람이 발생하고, 해당 배치는 품질 검토 대상으로 자동 등록됩니다.</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <header><h2>인터록 상태</h2><span class="sub">안전 연동</span></header>
+    <div class="body tight">
+      <table class="tb"><tbody id="il-tb"></tbody></table>
+      <div class="note" style="margin:10px 12px">
+        인터록은 PLC 안전 로직에서 직접 동작합니다. 본 시스템은 상태를 감시만 하며 해제 권한은 없습니다.
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="grid g2">
+  <div class="card">
+    <header><h2>공정 조건 준수율</h2><span class="sub">최근 10 배치 · 설정값 대비 편차</span></header>
+    <div class="body"><div id="ch-dev"></div></div>
+  </div>
+  <div class="card">
+    <header><h2>배치 이력</h2><span class="sub">최근 8건</span></header>
+    <div class="body tight">
+      <table class="tb">
+        <thead><tr><th>배치번호</th><th>레시피</th><th>설비</th><th class="num">소요</th><th class="num">최대편차</th><th>판정</th></tr></thead>
+        <tbody id="bh-tb"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script src="../assets/js/auth.js"></script>
+<script src="../assets/js/mock.js"></script>
+<script src="../assets/js/chart.js"></script>
+<script src="../assets/js/shell.js"></script>
+<script>
+(function () {
+  var NS = 'http://www.w3.org/2000/svg';
+  var PH = ['칭량', '투입', '승온', '교반', '반응', '냉각', '배출'];
+  var RX = Mock.reactors();
+
+  function vessel(level, stirring, jacketHot) {
+    var s = '<svg viewBox="0 0 120 170">';
+    // 자켓
+    s += '<rect x="14" y="30" width="92" height="108" rx="10" fill="none" stroke="' +
+      (jacketHot ? '#8a6a2a' : '#3b5a6b') + '" stroke-width="5" opacity=".55"/>';
+    // 본체
+    s += '<rect x="22" y="36" width="76" height="96" rx="8" fill="#1a212a" stroke="#4a5866"/>';
+    // 내용물
+    var lh = 92 * level / 100;
+    s += '<rect x="24" y="' + (130 - lh) + '" width="72" height="' + lh + '" rx="6" fill="#2e4a63"/>';
+    // 교반축
+    s += '<line x1="60" y1="20" x2="60" y2="' + (132 - lh * 0.35) + '" stroke="#6e7885" stroke-width="3"/>';
+    s += '<rect x="46" y="' + (128 - lh * 0.35) + '" width="28" height="5" rx="2" fill="#6e7885"/>';
+    // 모터
+    s += '<rect x="46" y="6" width="28" height="16" rx="3" fill="' + (stirring ? '#24352b' : '#232c37') +
+      '" stroke="' + (stirring ? '#4f9e63' : '#4a5866') + '"/>';
+    if (stirring) s += '<circle cx="60" cy="14" r="3" fill="#4f9e63"><animate attributeName="opacity" values="1;.25;1" dur="1.1s" repeatCount="indefinite"/></circle>';
+    // 노즐
+    s += '<line x1="30" y1="36" x2="30" y2="24" stroke="#4a5866" stroke-width="3"/>';
+    s += '<line x1="90" y1="36" x2="90" y2="24" stroke="#4a5866" stroke-width="3"/>';
+    // 배출 밸브
+    s += '<line x1="60" y1="132" x2="60" y2="150" stroke="#4a5866" stroke-width="4"/>';
+    s += '<polygon points="52,150 68,150 60,160" fill="#232c37" stroke="#4a5866"/>';
+    s += '<text x="60" y="169" fill="#6e7885" font-size="9" font-family="Consolas" text-anchor="middle">LV ' + level + '%</text>';
+    s += '</svg>';
+    return s;
+  }
+
+  function mini(label, val, unit, sp, state) {
+    return '<div class="pvmini ' + (state || '') + '"><div class="l">' + label + '</div>' +
+      '<div class="v">' + val + '<span style="font-size:10px;color:#6e7885"> ' + unit + '</span></div>' +
+      '<div class="s">' + (sp != null ? 'SP ' + sp : '&nbsp;') + '</div></div>';
+  }
+
+  function drawRx() {
+    document.getElementById('rxs').innerHTML = RX.map(function (r) {
+      var tTag = r.id === 'R-201' ? Mock.tag('MIX02_TT201') : Mock.tag('MIX01_TT101');
+      var pTag = r.id === 'R-201' ? Mock.tag('MIX02_PT202') : Mock.tag('MIX01_PT102');
+      var sTag = r.id === 'R-201' ? Mock.tag('MIX02_ST203') : Mock.tag('MIX01_ST103');
+      var tSt = Mock.tagState(tTag), pSt = Mock.tagState(pTag), sSt = Mock.tagState(sTag);
+
+      return '<div class="rx"><header><b>' + r.name + '</b>' +
+        '<span class="dim" style="font-size:10.5px">' + r.batch + ' · ' + r.recipe + '</span>' +
+        '<span style="flex:1"></span>' +
+        '<span class="st st-run">' + r.status + '</span></header>' +
+        '<div class="body">' +
+          '<div class="vessel">' + vessel(r.level, r.rpm > 0, r.jacket > 40) + '</div>' +
+          '<div>' +
+            '<div class="phase">' + PH.map(function (p, i) {
+              return '<div class="' + (i < r.phaseIdx ? 'done' : i === r.phaseIdx ? 'on' : '') + '">' + p + '</div>';
+            }).join('') + '</div>' +
+            '<div class="pvrow">' +
+              mini('반응조 온도', tTag.pv.toFixed(1), '℃', r.spTemp, tSt === 'ok' ? '' : tSt) +
+              mini('내압', pTag.pv.toFixed(2), 'bar', '1.00', pSt === 'ok' ? '' : pSt) +
+              mini('교반속도', sTag.pv.toFixed(0), 'rpm', r.rpm, sSt === 'ok' ? '' : sSt) +
+              mini('자켓 온도', r.jacket.toFixed(1), '℃', null, '') +
+            '</div>' +
+            '<table class="tb" style="margin-top:10px">' +
+              '<tr><td class="dim" style="width:72px">현재 페이즈</td><td><b>' + r.phase + '</b></td>' +
+                  '<td class="dim" style="width:64px">경과</td><td class="num">' + r.elapsed + '</td></tr>' +
+              '<tr><td class="dim">잔여 예상</td><td>' + r.remain + '</td>' +
+                  '<td class="dim">레벨</td><td class="num">' + r.level + ' %</td></tr>' +
+            '</table>' +
+          '</div>' +
+        '</div></div>';
+    }).join('');
+  }
+  drawRx();
+  Mock.onTick(drawRx);
+  Mock.start(2000);
+
+  // ---- 배치 트렌드 ----
+  var labels = [], temp = [], sp = [], jacket = [], press = [];
+  for (var i = 0; i < 60; i++) {
+    var d = new Date(Date.now() - (60 - i) * 3 * 60000);
+    labels.push(Mock.hhmm(d));
+    var t = i < 8 ? 25 + i * 4.6
+          : i < 14 ? 61 + Math.sin(i) * 0.8
+          : i < 46 ? 62 + Math.sin(i * 0.6) * 1.4
+          : Math.max(40, 62 - (i - 46) * 1.6);
+    temp.push(+t.toFixed(1));
+    sp.push(i < 46 ? 62 : 40);
+    jacket.push(+(i < 14 ? 70 - i * 0.6 : i < 46 ? 58 + Math.sin(i * 0.4) * 2 : 22 + Math.sin(i) * 1.2).toFixed(1));
+    press.push(+(1.0 + (i > 8 && i < 46 ? 0.06 + Math.sin(i * 0.5) * 0.03 : 0.01)).toFixed(3));
+  }
+
+  Chart.line(document.getElementById('ch-t'), {
+    labels: labels, h: 196, min: 10, max: 85,
+    series: [
+      { name: 'SP', color: '#d6a02c', data: sp, width: 1.1 },
+      { name: '자켓', color: '#5f8a76', data: jacket, width: 1.3 },
+      { name: '온도', color: '#8fa8c0', data: temp }
+    ]
+  });
+  Chart.line(document.getElementById('ch-p'), {
+    labels: labels, h: 96, min: 0.9, max: 1.3,
+    series: [{ name: '압력', color: '#7f93ab', data: press }],
+    refs: [{ v: 1.25, color: '#d6a02c', label: 'H 1.25' }]
+  });
+
+  // ---- 인터록 ----
+  var IL = [
+    { n: '반응조 과압 (PSH-202)', st: '정상', d: '설정 1.50 bar' },
+    { n: '반응조 과열 (TSH-201)', st: '정상', d: '설정 70.0 ℃' },
+    { n: '교반기 무부하 (ZSL-203)', st: '정상', d: '레벨 20% 미만 시 정지' },
+    { n: '배출밸브 연동 (XV-205)', st: '차단', d: '교반 중 배출 금지' },
+    { n: '맨홀 개방 (ZS-207)', st: '정상', d: '개방 시 전체 정지' },
+    { n: '비상정지 (ESD-200)', st: '정상', d: '리셋 필요 없음' },
+    { n: '질소 퍼지 압력 (PSL-209)', st: '주의', d: '4.8 bar (하한 5.0)' }
+  ];
+  document.getElementById('il-tb').innerHTML = IL.map(function (x) {
+    var c = x.st === '정상' ? 'st-run' : x.st === '차단' ? 'st-act' : 'st-warn';
+    return '<tr><td style="width:150px">' + x.n + '</td>' +
+      '<td style="width:52px"><span class="st ' + c + '">' + x.st + '</span></td>' +
+      '<td class="dim" style="font-size:10.5px">' + x.d + '</td></tr>';
+  }).join('');
+
+  // ---- 편차 ----
+  var dev = [0.8, 1.2, 0.6, 2.4, 0.9, 1.1, 3.1, 0.7, 1.4, 0.9];
+  Chart.bars(document.getElementById('ch-dev'), {
+    labels: dev.map(function (_, i) { return 'B' + (i + 1); }),
+    data: dev, h: 190, showValue: true, max: 4,
+    colors: dev.map(function (v) { return v > 2 ? '#d6a02c' : '#4a5666'; })
+  });
+
+  // ---- 배치 이력 ----
+  var BH = [
+    { no: 'BT-260923-004', rc: 'RC-EM220-v4', eq: 'R-201', t: '진행중', d: 1.9, j: '진행' },
+    { no: 'BT-260923-003', rc: 'RC-AD330-v2', eq: 'R-101', t: '진행중', d: 0.9, j: '진행' },
+    { no: 'BT-260923-002', rc: 'RC-EM220-v4', eq: 'R-201', t: '4h 12m', d: 1.4, j: '합격' },
+    { no: 'BT-260922-011', rc: 'RC-AD330-v2', eq: 'R-101', t: '3h 48m', d: 0.7, j: '합격' },
+    { no: 'BT-260922-010', rc: 'RC-EM220-v4', eq: 'R-201', t: '4h 26m', d: 3.1, j: '검토' },
+    { no: 'BT-260922-009', rc: 'RC-EM220-v4', eq: 'R-201', t: '4h 08m', d: 1.1, j: '합격' },
+    { no: 'BT-260921-014', rc: 'RC-AD330-v2', eq: 'R-101', t: '3h 52m', d: 0.9, j: '합격' },
+    { no: 'BT-260921-013', rc: 'RC-EM220-v4', eq: 'R-201', t: '4h 19m', d: 2.4, j: '검토' }
+  ];
+  document.getElementById('bh-tb').innerHTML = BH.map(function (b) {
+    var c = b.j === '합격' ? 'st-run' : b.j === '검토' ? 'st-warn' : 'st-idle';
+    return '<tr><td class="tag">' + b.no + '</td><td class="dim">' + b.rc + '</td><td>' + b.eq + '</td>' +
+      '<td class="num dim">' + b.t + '</td>' +
+      '<td class="num" style="color:' + (b.d > 2 ? 'var(--warn)' : 'var(--txt)') + '">±' + b.d.toFixed(1) + '℃</td>' +
+      '<td><span class="st ' + c + '">' + b.j + '</span></td></tr>';
+  }).join('');
+})();
+</script>
+</body>
+</html>
