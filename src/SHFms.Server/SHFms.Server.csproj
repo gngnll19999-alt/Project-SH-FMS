@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>SHFms.Server</RootNamespace>
+    <AssemblyName>SHFms.Server</AssemblyName>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+  </PropertyGroup>
+
+  <!--
+    외부 NuGet 패키지를 쓰지 않는다.
+    제어망 서버라 패키지 반입에 보안 심의가 붙고, 필요한 건 ASP.NET Core 에 다 들어 있다.
+    (SignalR / Minimal API / System.Text.Json 전부 프레임워크 내장)
+  -->
+
+  <ItemGroup>
+    <None Update="config\alarms.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,66 @@
+[
+  {
+    "tag": "MIX01_TT101", "desc": "배합 1호기 반응조 온도", "unit": "℃", "area": "A동",
+    "loLo": 40, "lo": 44, "hi": 52, "hiHi": 56, "deadband": 0.5, "priority": 2
+  },
+  {
+    "tag": "MIX01_PT102", "desc": "배합 1호기 내압", "unit": "bar", "area": "A동",
+    "loLo": 0.7, "lo": 0.85, "hi": 1.25, "hiHi": 1.5, "deadband": 0.03, "priority": 1
+  },
+  {
+    "tag": "MIX01_ST103", "desc": "배합 1호기 교반속도", "unit": "rpm", "area": "A동",
+    "loLo": 40, "lo": 52, "hi": 68, "hiHi": 80, "deadband": 2, "priority": 3
+  },
+  {
+    "tag": "MIX02_TT201", "desc": "배합 2호기 반응조 온도", "unit": "℃", "area": "A동",
+    "loLo": 54, "lo": 58, "hi": 66, "hiHi": 70, "deadband": 0.5, "priority": 2
+  },
+  {
+    "tag": "MIX02_PT202", "desc": "배합 2호기 내압", "unit": "bar", "area": "A동",
+    "loLo": 0.7, "lo": 0.85, "hi": 1.25, "hiHi": 1.5, "deadband": 0.03, "priority": 1
+  },
+  {
+    "tag": "MIX02_ST203", "desc": "배합 2호기 교반속도", "unit": "rpm", "area": "A동",
+    "loLo": 110, "lo": 128, "hi": 152, "hiHi": 170, "deadband": 3, "priority": 3
+  },
+  {
+    "tag": "CT01_TT301", "desc": "코팅 1라인 건조로 온도", "unit": "℃", "area": "B동",
+    "loLo": 105, "lo": 112, "hi": 128, "hiHi": 138, "deadband": 1.0, "priority": 2
+  },
+  {
+    "tag": "CT01_SP302", "desc": "코팅 1라인 라인속도", "unit": "m/min", "area": "B동",
+    "loLo": 15, "lo": 20, "hi": 28, "hiHi": 32, "deadband": 0.5, "priority": 3
+  },
+  {
+    "tag": "CT01_TH303", "desc": "코팅 1라인 도포두께", "unit": "mm", "area": "B동",
+    "loLo": 0.112, "lo": 0.114, "hi": 0.126, "hiHi": 0.128, "deadband": 0.001, "priority": 2
+  },
+  {
+    "tag": "CT02_TT401", "desc": "코팅 2라인 건조로 온도", "unit": "℃", "area": "B동",
+    "loLo": 105, "lo": 112, "hi": 128, "hiHi": 138, "deadband": 1.0, "priority": 2
+  },
+  {
+    "tag": "CT02_SP402", "desc": "코팅 2라인 라인속도", "unit": "m/min", "area": "B동",
+    "loLo": 15, "lo": 20, "hi": 28, "hiHi": 32, "deadband": 0.5, "priority": 3
+  },
+  {
+    "tag": "UTL_AIR701", "desc": "압축공기 공급압", "unit": "bar", "area": "유틸",
+    "loLo": 5.5, "lo": 6.0, "hi": 7.0, "hiHi": 7.5, "deadband": 0.05, "priority": 2
+  },
+  {
+    "tag": "UTL_CHW702", "desc": "냉각수 공급온도", "unit": "℃", "area": "유틸",
+    "loLo": 8, "lo": 10, "hi": 15, "hiHi": 18, "deadband": 0.3, "priority": 2
+  },
+  {
+    "tag": "UTL_STM703", "desc": "스팀 헤더압", "unit": "bar", "area": "유틸",
+    "loLo": 6.5, "lo": 7.2, "hi": 8.6, "hiHi": 9.2, "deadband": 0.1, "priority": 2
+  },
+  {
+    "tag": "ENV_VOC801", "desc": "A동 VOC 농도", "unit": "ppm", "area": "A동",
+    "hi": 50, "hiHi": 100, "deadband": 2.0, "priority": 1
+  },
+  {
+    "tag": "ENV_O2802", "desc": "B동 산소 농도", "unit": "%", "area": "B동",
+    "loLo": 18, "lo": 19.5, "hi": 23, "hiHi": 25, "deadband": 0.2, "priority": 1
+  }
+]
