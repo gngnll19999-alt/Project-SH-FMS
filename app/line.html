@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>라인 공정 미믹 · SH-FMS</title>
+<link rel="stylesheet" href="../assets/css/app.css">
+<style>
+  .mimic { background: #0d1116; border: 1px solid var(--line); border-radius: 3px; }
+  .mimic svg { display: block; width: 100%; }
+  .u-box { fill: #1a212a; stroke: #39434f; stroke-width: 1; }
+  .u-box.run { stroke: #4a5866; }
+  .u-box.stop { stroke: #d6483c; fill: #1d1518; }
+  .u-lbl { fill: #aeb7c3; font-size: 11px; font-family: "Malgun Gothic", sans-serif; }
+  .u-sub { fill: #6e7885; font-size: 9.5px; font-family: Consolas, monospace; }
+  .pipe { stroke: #39434f; stroke-width: 3; fill: none; }
+  .pipe.flow { stroke: #5f7d99; }
+  .pipe.dead { stroke: #2a323d; stroke-dasharray: 4 4; }
+  .flowdot { fill: #7fa3c4; }
+  .pvtxt { font-family: Consolas, monospace; font-size: 12px; fill: #c9cfd8; }
+  .pvtxt.warn { fill: #e0b658; }
+  .pvtxt.alarm { fill: #e57b71; }
+  .pvunit { font-family: Consolas, monospace; font-size: 9px; fill: #6e7885; }
+  .tank { fill: #1a212a; stroke: #39434f; }
+  .lvl { fill: #33506b; }
+  .motor { fill: #232c37; stroke: #4a5866; }
+  .motor.on { fill: #24352b; stroke: #4f9e63; }
+  .stepbar { display: flex; gap: 2px; }
+  .stepbar div {
+    flex: 1; text-align: center; font-size: 10.5px; padding: 6px 2px;
+    background: #151b23; color: #6e7885; border-top: 2px solid #2a323d;
+  }
+  .stepbar div.on { color: #c9cfd8; border-top-color: #5f7d99; background: #18202a; }
+  .stepbar div.bad { color: #e57b71; border-top-color: #d6483c; background: #1d1518; }
+</style>
+</head>
+<body data-page="line" data-title="라인 공정 미믹" data-crumb="B동 코팅 1라인" data-lvl="ISA-101 LEVEL 2">
+
+<div class="filters">
+  <label>라인</label>
+  <select id="f-line">
+    <option value="CT01">CT-01 코팅 1라인</option>
+    <option value="CT02">CT-02 코팅 2라인 (정지)</option>
+    <option value="MIX">MIX-01/02 배합 라인</option>
+  </select>
+  <label>표시</label>
+  <select><option>공정값 + 상태</option><option>공정값만</option><option>상태만</option></select>
+  <button class="btn pri" id="f-go">전환</button>
+  <div style="flex:1"></div>
+  <span class="dim" style="font-size:11px" id="scan">스캔 1s · 최종 수신 --:--:--</span>
+</div>
+
+<div class="card" style="margin-bottom:10px">
+  <header>
+    <h2 id="mimic-title">CT-01 코팅 1라인 공정 흐름</h2>
+    <span class="sub">원료 투입 → 코팅 → 건조 → 권취 → 검사 → 포장</span>
+    <div class="spacer"></div>
+    <span class="st st-run" id="line-st">가동</span>
+  </header>
+  <div class="body tight">
+    <div class="mimic" id="mimic"></div>
+    <div class="stepbar" id="steps"></div>
+  </div>
+</div>
+
+<div class="grid" style="grid-template-columns:1fr 340px">
+  <div class="card">
+    <header><h2>공정값 상세</h2><span class="sub">해당 라인 태그</span></header>
+    <div class="body tight">
+      <table class="tb">
+        <thead><tr>
+          <th style="width:110px">태그</th><th>설명</th>
+          <th class="num" style="width:84px">현재값</th><th style="width:40px">단위</th>
+          <th class="num" style="width:70px">설정값</th>
+          <th class="num" style="width:70px">L</th><th class="num" style="width:70px">H</th>
+          <th style="width:70px">상태</th><th style="width:104px">수집원</th><th style="width:96px">트렌드</th>
+        </tr></thead>
+        <tbody id="tag-tb"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div>
+    <div class="card" style="margin-bottom:10px">
+      <header><h2>구동부 상태</h2></header>
+      <div class="body tight"><table class="tb"><tbody id="drv-tb"></tbody></table></div>
+    </div>
+    <div class="card">
+      <header><h2>최근 상태 변화</h2><span class="sub">이벤트 로그</span></header>
+      <div class="body tight" style="max-height:200px;overflow-y:auto">
+        <table class="tb"><tbody id="ev-tb"></tbody></table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="../assets/js/auth.js"></script>
+<script src="../assets/js/mock.js"></script>
+<script src="../assets/js/chart.js"></script>
+<script src="../assets/js/shell.js"></script>
+<script>
+(function () {
+  var NS = 'http://www.w3.org/2000/svg';
+  var cur = 'CT01';
+
+  var LINES = {
+    CT01: {
+      title: 'CT-01 코팅 1라인 공정 흐름',
+      status: '가동',
+      tags: ['CT01_TT301', 'CT01_SP302', 'CT01_TH303'],
+      steps: ['원단 투입', '코팅', '건조', '권취', '검사', '포장'],
+      at: 2,
+      drives: [
+        { n: '언와인더 M-301', st: '운전', load: 42 },
+        { n: '코팅 다이 M-302', st: '운전', load: 61 },
+        { n: '건조로 송풍 M-303', st: '운전', load: 74 },
+        { n: '리와인더 M-304', st: '운전', load: 38 }
+      ]
+    },
+    CT02: {
+      title: 'CT-02 코팅 2라인 공정 흐름',
+      status: '정지',
+      tags: ['CT02_TT401', 'CT02_SP402'],
+      steps: ['원단 투입', '코팅', '건조', '권취', '검사', '포장'],
+      at: 2, bad: true,
+      drives: [
+        { n: '언와인더 M-401', st: '정지', load: 0 },
+        { n: '코팅 다이 M-402', st: '정지', load: 0 },
+        { n: '건조로 송풍 M-403', st: '정지', load: 0 },
+        { n: '리와인더 M-404', st: '트립', load: 0 }
+      ]
+    },
+    MIX: {
+      title: 'MIX-01/02 배합 라인 공정 흐름',
+      status: '가동',
+      tags: ['MIX01_TT101', 'MIX01_PT102', 'MIX01_ST103', 'MIX02_TT201', 'MIX02_PT202', 'MIX02_ST203'],
+      steps: ['원료 칭량', '투입', '승온', '교반', '반응', '배출'],
+      at: 3,
+      drives: [
+        { n: '교반기 M-101', st: '운전', load: 55 },
+        { n: '교반기 M-201', st: '운전', load: 68 },
+        { n: '이송펌프 P-110', st: '운전', load: 31 },
+        { n: '자켓 순환 P-210', st: '운전', load: 47 }
+      ]
+    }
+  };
+
+  function n(tag, attr, parent) {
+    var e = document.createElementNS(NS, tag);
+    for (var k in attr) if (attr.hasOwnProperty(k)) e.setAttribute(k, attr[k]);
+    if (parent) parent.appendChild(e);
+    return e;
+  }
+  function txt(p, x, y, s, cls) {
+    var t = n('text', { x: x, y: y, class: cls || 'u-lbl' }, p);
+    t.textContent = s;
+    return t;
+  }
+
+  function unit(svg, x, y, w, h, label, sub, state) {
+    n('rect', { x: x, y: y, width: w, height: h, rx: 3, class: 'u-box ' + (state || '') }, svg);
+    txt(svg, x + w / 2, y + h / 2 + 1, label).setAttribute('text-anchor', 'middle');
+    if (sub) {
+      var t = txt(svg, x + w / 2, y + h / 2 + 14, sub, 'u-sub');
+      t.setAttribute('text-anchor', 'middle');
+    }
+  }
+
+  function pipe(svg, pts, dead) {
+    var d = pts.map(function (p, i) { return (i ? 'L' : 'M') + p[0] + ' ' + p[1]; }).join(' ');
+    var p = n('path', { d: d, class: 'pipe ' + (dead ? 'dead' : 'flow') }, svg);
+    if (!dead) {
+      var dot = n('circle', { r: 2.6, class: 'flowdot' }, svg);
+      var anim = n('animateMotion', { dur: '2.6s', repeatCount: 'indefinite', path: d }, dot);
+      void anim;
+    }
+    return p;
+  }
+
+  function tank(svg, x, y, w, h, level, label) {
+    n('rect', { x: x, y: y, width: w, height: h, rx: 3, class: 'tank' }, svg);
+    var lh = h * level / 100;
+    n('rect', { x: x + 1.5, y: y + h - lh, width: w - 3, height: Math.max(0, lh - 1.5), class: 'lvl' }, svg);
+    var t = txt(svg, x + w / 2, y + h + 13, label, 'u-sub');
+    t.setAttribute('text-anchor', 'middle');
+    var pct = txt(svg, x + w / 2, y + h / 2 + 4, level + '%', 'pvtxt');
+    pct.setAttribute('text-anchor', 'middle');
+  }
+
+  function pvLabel(svg, x, y, tagName) {
+    var t = Mock.tag(tagName);
+    if (!t) return;
+    var st = Mock.tagState(t);
+    var cls = 'pvtxt' + (st === 'alarm' ? ' alarm' : st === 'warn' ? ' warn' : '');
+    var dec = t.unit === 'mm' ? 3 : t.unit === 'bar' ? 2 : 1;
+    var v = txt(svg, x, y, t.pv.toFixed(dec), cls);
+    v.setAttribute('data-pv', tagName);
+    v.setAttribute('text-anchor', 'middle');
+    var u = txt(svg, x, y + 11, t.desc.replace(/^.*?(라인|호기)\s*/, '') + ' ' + t.unit, 'pvunit');
+    u.setAttribute('text-anchor', 'middle');
+  }
+
+  function drawCoating(dead) {
+    var svg = n('svg', { viewBox: '0 0 1000 300' });
+    // 원단 롤
+    n('circle', { cx: 70, cy: 170, r: 30, class: 'u-box ' + (dead ? 'stop' : 'run') }, svg);
+    n('circle', { cx: 70, cy: 170, r: 9, class: 'motor ' + (dead ? '' : 'on') }, svg);
+    txt(svg, 70, 218, '언와인더', 'u-sub').setAttribute('text-anchor', 'middle');
+
+    pipe(svg, [[100, 170], [190, 170]], dead);
+
+    // 코팅 다이 + 슬러리 탱크
+    tank(svg, 205, 40, 46, 62, 68, '슬러리 탱크');
+    pipe(svg, [[228, 102], [228, 145]], dead);
+    unit(svg, 190, 145, 76, 50, '코팅 다이', 'CT-D12', dead ? 'stop' : 'run');
+    pvLabel(svg, 228, 228, dead ? 'CT02_SP402' : 'CT01_TH303');
+
+    pipe(svg, [[266, 170], [330, 170]], dead);
+
+    // 건조로 3존
+    unit(svg, 330, 132, 230, 76, '건조로 (3 ZONE)', dead ? 'CT-02' : 'CT-01', dead ? 'stop' : 'run');
+    [385, 445, 505].forEach(function (x, i) {
+      n('rect', { x: x - 18, y: 142, width: 36, height: 12, rx: 2, class: 'motor ' + (dead ? '' : 'on') }, svg);
+      txt(svg, x, 151, 'Z' + (i + 1), 'u-sub').setAttribute('text-anchor', 'middle');
+    });
+    pvLabel(svg, 445, 240, dead ? 'CT02_TT401' : 'CT01_TT301');
+
+    pipe(svg, [[560, 170], [625, 170]], dead);
+
+    // 권취
+    n('circle', { cx: 660, cy: 170, r: 28, class: 'u-box ' + (dead ? 'stop' : 'run') }, svg);
+    n('circle', { cx: 660, cy: 170, r: 8, class: 'motor ' + (dead ? '' : 'on') }, svg);
+    txt(svg, 660, 216, '리와인더', 'u-sub').setAttribute('text-anchor', 'middle');
+    pvLabel(svg, 660, 250, dead ? 'CT02_SP402' : 'CT01_SP302');
+
+    pipe(svg, [[690, 170], [750, 170]], dead);
+
+    // 검사
+    unit(svg, 750, 142, 84, 56, '비전 검사', 'INS-01', dead ? '' : 'run');
+    n('circle', { cx: 792, cy: 128, r: 6, class: 'motor on' }, svg);
+
+    pipe(svg, [[834, 170], [890, 170]], dead);
+    unit(svg, 890, 142, 84, 56, '포장', 'PK-01', '');
+
+    // 상단 유틸 배관
+    pipe(svg, [[30, 46], [180, 46]], true);
+    txt(svg, 30, 38, '압축공기 6.4 bar', 'u-sub');
+    pipe(svg, [[600, 46], [960, 46]], true);
+    txt(svg, 600, 38, '배기 / VOC 처리', 'u-sub');
+
+    return svg;
+  }
+
+  function drawMix() {
+    var svg = n('svg', { viewBox: '0 0 1000 300' });
+
+    // 원료 사일로 3기
+    [[60, 'BD-2200'], [140, 'SV-0110'], [220, 'CB-0450']].forEach(function (s, i) {
+      tank(svg, s[0], 24, 44, 58, [62, 78, 41][i], s[1]);
+      pipe(svg, [[s[0] + 22, 82], [s[0] + 22, 108], [330, 108]], false);
+    });
+
+    // 칭량 호퍼
+    unit(svg, 330, 92, 70, 34, '칭량 호퍼', 'WT-100', 'run');
+    pipe(svg, [[365, 126], [365, 150]], false);
+
+    // 반응기 R-101
+    n('rect', { x: 300, y: 150, width: 130, height: 96, rx: 8, class: 'u-box run' }, svg);
+    n('rect', { x: 305, y: 196, width: 120, height: 46, rx: 6, class: 'lvl' }, svg);
+    n('line', { x1: 365, y1: 150, x2: 365, y2: 220, stroke: '#6e7885', 'stroke-width': 2 }, svg);
+    n('circle', { cx: 365, cy: 144, r: 10, class: 'motor on' }, svg);
+    txt(svg, 365, 262, 'R-101 배합 1호기', 'u-sub').setAttribute('text-anchor', 'middle');
+    pvLabel(svg, 250, 176, 'MIX01_TT101');
+    pvLabel(svg, 250, 216, 'MIX01_PT102');
+    pvLabel(svg, 480, 176, 'MIX01_ST103');
+
+    // 반응기 R-201
+    n('rect', { x: 600, y: 150, width: 130, height: 96, rx: 8, class: 'u-box run' }, svg);
+    n('rect', { x: 605, y: 186, width: 120, height: 56, rx: 6, class: 'lvl' }, svg);
+    n('line', { x1: 665, y1: 150, x2: 665, y2: 214, stroke: '#6e7885', 'stroke-width': 2 }, svg);
+    n('circle', { cx: 665, cy: 144, r: 10, class: 'motor on' }, svg);
+    txt(svg, 665, 262, 'R-201 배합 2호기', 'u-sub').setAttribute('text-anchor', 'middle');
+    pvLabel(svg, 552, 176, 'MIX02_TT201');
+    pvLabel(svg, 552, 216, 'MIX02_PT202');
+    pvLabel(svg, 786, 176, 'MIX02_ST203');
+
+    pipe(svg, [[430, 108], [665, 108], [665, 134]], false);
+
+    // 자켓 순환
+    pipe(svg, [[300, 230], [250, 230], [250, 280], [730, 280], [730, 230], [730, 198]], true);
+    txt(svg, 470, 294, '자켓 순환 (냉각수 12.6℃ / 스팀 7.8 bar)', 'u-sub').setAttribute('text-anchor', 'middle');
+
+    // 배출
+    pipe(svg, [[730, 220], [820, 220]], false);
+    unit(svg, 820, 196, 90, 48, '충전 · 포장', 'FL-01', 'run');
+
+    return svg;
+  }
+
+  function render() {
+    var L = LINES[cur];
+    document.getElementById('mimic-title').textContent = L.title;
+    var st = document.getElementById('line-st');
+    st.textContent = L.status;
+    st.className = 'st ' + (L.status === '가동' ? 'st-run' : 'st-stop');
+
+    var host = document.getElementById('mimic');
+    host.innerHTML = '';
+    host.appendChild(cur === 'MIX' ? drawMix() : drawCoating(cur === 'CT02'));
+
+    document.getElementById('steps').innerHTML = L.steps.map(function (s, i) {
+      var cls = L.bad ? (i === L.at ? 'bad' : '') : (i <= L.at ? 'on' : '');
+      return '<div class="' + cls + '">' + (i + 1) + '. ' + s + '</div>';
+    }).join('');
+
+    // 태그 표
+    document.getElementById('tag-tb').innerHTML = L.tags.map(function (tg) {
+      var t = Mock.tag(tg), s = Mock.tagState(t);
+      var col = s === 'alarm' ? 'var(--bad)' : s === 'warn' ? 'var(--warn)' : 'var(--txt)';
+      var dec = t.unit === 'mm' ? 3 : t.unit === 'bar' ? 2 : 1;
+      return '<tr><td class="tag">' + t.tag + '</td><td>' + t.desc + '</td>' +
+        '<td class="num" style="color:' + col + ';font-weight:600" data-pvt="' + t.tag + '">' + t.pv.toFixed(dec) + '</td>' +
+        '<td class="dim">' + t.unit + '</td>' +
+        '<td class="num dim">' + t.sp + '</td>' +
+        '<td class="num dim">' + t.lo + '</td><td class="num dim">' + t.hi + '</td>' +
+        '<td>' + (s === 'alarm' ? '<span class="st st-stop">알람</span>' :
+                  s === 'warn' ? '<span class="st st-warn">경고</span>' : '<span class="st st-run">정상</span>') + '</td>' +
+        '<td class="dim" style="font-size:10.5px">' + t.src + '</td>' +
+        '<td><span class="sp-' + t.tag + '"></span></td></tr>';
+    }).join('');
+    L.tags.forEach(function (tg) {
+      var h = Mock.history(tg, 30);
+      var host2 = document.querySelector('.sp-' + tg);
+      if (host2) Chart.spark(host2, h.data, '#5f7d99');
+    });
+
+    // 구동부
+    document.getElementById('drv-tb').innerHTML = L.drives.map(function (d) {
+      var c = d.st === '운전' ? 'st-run' : d.st === '트립' ? 'st-stop' : 'st-idle';
+      return '<tr><td style="width:120px">' + d.n + '</td>' +
+        '<td style="width:52px"><span class="st ' + c + '">' + d.st + '</span></td>' +
+        '<td><div class="mini-bar"><i style="width:' + d.load + '%;background:' +
+          (d.load > 80 ? 'var(--warn)' : '#4a5666') + '"></i></div></td>' +
+        '<td class="num dim" style="width:40px">' + d.load + '%</td></tr>';
+    }).join('');
+  }
+
+  // 미믹 위 숫자만 갱신 (전체 재그리기는 깜빡임이 생긴다)
+  function tickValues() {
+    Array.prototype.forEach.call(document.querySelectorAll('[data-pv]'), function (el) {
+      var t = Mock.tag(el.getAttribute('data-pv'));
+      if (!t) return;
+      var s = Mock.tagState(t);
+      el.setAttribute('class', 'pvtxt' + (s === 'alarm' ? ' alarm' : s === 'warn' ? ' warn' : ''));
+      el.textContent = t.pv.toFixed(t.unit === 'mm' ? 3 : t.unit === 'bar' ? 2 : 1);
+    });
+    Array.prototype.forEach.call(document.querySelectorAll('[data-pvt]'), function (el) {
+      var t = Mock.tag(el.getAttribute('data-pvt'));
+      if (!t) return;
+      var s = Mock.tagState(t);
+      el.style.color = s === 'alarm' ? 'var(--bad)' : s === 'warn' ? 'var(--warn)' : 'var(--txt)';
+      el.textContent = t.pv.toFixed(t.unit === 'mm' ? 3 : t.unit === 'bar' ? 2 : 1);
+    });
+    document.getElementById('scan').textContent = '스캔 1s · 최종 수신 ' + Mock.hms(new Date());
+  }
+
+  var EV = [
+    { t: 4,  m: 'CT-02 라인 구동 모터 과부하 트립 — 라인 정지', lv: 'bad' },
+    { t: 6,  m: 'CT-02 건조로 온도 HH 초과 (141.2℃)', lv: 'bad' },
+    { t: 24, m: 'CT-01 라인속도 24.2 m/min 로 하향 (품질 대응)', lv: 'warn' },
+    { t: 41, m: 'MIX-02 페이즈 전환: 승온 → 교반', lv: 'info' },
+    { t: 58, m: 'CT-01 도포두께 관리상한 접근 (0.124mm)', lv: 'warn' },
+    { t: 76, m: 'AS-02 품목 변경 셋업 시작', lv: 'info' },
+    { t: 94, m: 'MIX-01 배치 BT-260923-003 개시', lv: 'info' }
+  ];
+  var evC = { bad: 'var(--bad)', warn: 'var(--warn)', info: 'var(--dim)' };
+  document.getElementById('ev-tb').innerHTML = EV.map(function (e) {
+    return '<tr><td class="dim" style="width:52px">' + Mock.hms(new Date(Date.now() - e.t * 60000)) + '</td>' +
+      '<td style="white-space:normal;color:' + evC[e.lv] + '">' + e.m + '</td></tr>';
+  }).join('');
+
+  document.getElementById('f-go').onclick = function () {
+    cur = document.getElementById('f-line').value;
+    render();
+  };
+  document.getElementById('f-line').onchange = function () {
+    cur = this.value; render();
+  };
+
+  render();
+  Mock.onTick(tickValues);
+  Mock.start(1500);
+  tickValues();
+})();
+</script>
+</body>
+</html>

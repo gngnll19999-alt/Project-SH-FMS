@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>공장 전체 감시 · SH-FMS</title>
+<link rel="stylesheet" href="../assets/css/app.css">
+<style>
+  .area {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 3px;
+    padding: 10px 11px;
+  }
+  .area .h { display: flex; align-items: center; gap: 7px; margin-bottom: 8px; }
+  .area .h b { font-size: 12px; }
+  .area .h .sp { flex: 1; }
+  .area .eq {
+    display: flex; align-items: center; gap: 7px; padding: 5px 7px;
+    border: 1px solid var(--line); border-radius: 2px; margin-bottom: 4px; background: #10151c;
+    font-size: 11px;
+  }
+  .area .eq .dot { width: 7px; height: 7px; border-radius: 50%; background: #3d4652; flex: 0 0 auto; }
+  .area .eq.run .dot { background: var(--ok); }
+  .area .eq.stop .dot { background: var(--bad); }
+  .area .eq.stop { border-color: rgba(214,72,60,.4); }
+  .area .eq.set .dot { background: var(--warn); }
+  .area .eq .nm { flex: 1; }
+  .area .eq .oee { font-family: var(--mono); color: var(--txt-2); }
+  .camthumb { background: #0b0e12; border: 1px solid var(--line); border-radius: 2px; overflow: hidden; }
+  .camthumb .cap { font-size: 10px; color: var(--dim); padding: 4px 6px; border-top: 1px solid var(--line); }
+</style>
+</head>
+<body data-page="overview" data-title="공장 전체 감시" data-crumb="화성1공장" data-lvl="ISA-101 LEVEL 1">
+
+<div class="grid g6" style="margin-bottom:10px" id="kpi"></div>
+
+<div class="grid g4" style="margin-bottom:10px" id="areas"></div>
+
+<div class="card" style="margin-bottom:10px">
+  <header>
+    <h2>핵심 공정값</h2>
+    <span class="sub">실시간 · 스캔 1초</span>
+    <div class="spacer"></div>
+    <div class="legend">
+      <span><i style="background:#333c48"></i>정상</span>
+      <span><i style="background:#d6a02c"></i>경고 (H/L)</span>
+      <span><i style="background:#d6483c"></i>알람 (HH/LL)</span>
+    </div>
+  </header>
+  <div class="body">
+    <div class="grid g6" id="pvs"></div>
+    <div class="note">정상 범위 내 값은 색을 쓰지 않습니다. 화면에서 색이 보이면 그 자체가 확인해야 할 신호입니다. (ISA-101)</div>
+  </div>
+</div>
+
+<div class="grid" style="grid-template-columns:1fr 1fr 340px">
+  <div class="card">
+    <header><h2>활성 알람</h2><span class="sub">미확인 우선</span>
+      <div class="spacer"></div><a href="alarm.html" class="btn sm">전체 보기</a></header>
+    <div class="body tight" style="max-height:230px;overflow-y:auto">
+      <table class="tb"><tbody id="al-tb"></tbody></table>
+    </div>
+  </div>
+
+  <div class="card">
+    <header><h2>영상 감시</h2><span class="sub">주요 구역 4개소</span>
+      <div class="spacer"></div><a href="cctv.html" class="btn sm">통합관제</a></header>
+    <div class="body">
+      <div class="grid g2" id="cams" style="gap:6px"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <header><h2>유틸리티</h2><span class="sub">공급 상태</span></header>
+    <div class="body tight">
+      <table class="tb"><tbody id="utl-tb"></tbody></table>
+      <div style="padding:10px 12px">
+        <div class="dim" style="font-size:10.5px;margin-bottom:5px">금일 전력 사용량</div>
+        <div id="ch-pw"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="../assets/js/auth.js"></script>
+<script src="../assets/js/mock.js"></script>
+<script src="../assets/js/chart.js"></script>
+<script src="../assets/js/cctv.js"></script>
+<script src="../assets/js/shell.js"></script>
+<script>
+(function () {
+  var AL = Mock.alarms();
+  var EQ = Mock.EQUIP;
+
+  // ---- KPI ----
+  var run = EQ.filter(function (e) { return e.status === '가동'; }).length;
+  var act = AL.filter(function (a) { return !a.ack; });
+  var oee = EQ.reduce(function (a, e) { return a + e.oee; }, 0) / EQ.length;
+
+  document.getElementById('kpi').innerHTML = [
+    { t: 'EQ_RUN',   l: '가동 설비', v: run + '/' + EQ.length, u: '', c: run === EQ.length ? '' : 'warn' },
+    { t: 'ALM_ACT',  l: '미확인 알람', v: act.length, u: '건', c: act.filter(function (a) { return a.pri === 1; }).length ? 'alarm' : 'warn' },
+    { t: 'PRD_RATE', l: '생산 달성률', v: '93.4', u: '%', c: '' },
+    { t: 'OEE_ALL',  l: '종합 OEE', v: oee.toFixed(1), u: '%', c: '' },
+    { t: 'PWR_NOW',  l: '순간 전력', v: '1,186', u: 'kW', c: '' },
+    { t: 'SAF_DAYS', l: '무재해', v: '412', u: '일', c: '' }
+  ].map(function (k) {
+    return '<div class="pv ' + k.c + '"><div class="lip"></div>' +
+      '<div class="tag">' + k.t + '</div><div class="lbl">' + k.l + '</div>' +
+      '<div class="val">' + k.v + (k.u ? '<small>' + k.u + '</small>' : '') + '</div></div>';
+  }).join('');
+
+  // ---- 동별 설비 ----
+  var areas = {};
+  EQ.forEach(function (e) { (areas[e.area] = areas[e.area] || []).push(e); });
+  var stC = { '가동': 'run', '정지': 'stop', '셋업': 'set', '대기': '' };
+  document.getElementById('areas').innerHTML = Object.keys(areas).map(function (a) {
+    var list = areas[a];
+    var bad = list.filter(function (e) { return e.status === '정지'; }).length;
+    return '<div class="area"><div class="h"><b>' + a + '</b>' +
+      '<span class="dim" style="font-size:10.5px">' + list.length + '기</span><span class="sp"></span>' +
+      (bad ? '<span class="st st-stop">정지 ' + bad + '</span>' : '<span class="st st-run">정상</span>') + '</div>' +
+      list.map(function (e) {
+        return '<div class="eq ' + stC[e.status] + '"><span class="dot"></span>' +
+          '<span class="nm">' + e.code + ' <span class="dim">' + e.name + '</span></span>' +
+          '<span class="oee">' + e.oee.toFixed(0) + '%</span></div>';
+      }).join('') + '</div>';
+  }).join('');
+
+  // ---- 공정값 타일 (실시간 갱신) ----
+  function pvHtml(t) {
+    var st = Mock.tagState(t);
+    var cls = st === 'alarm' ? 'alarm' : st === 'warn' ? 'warn' : '';
+    var dec = t.unit === 'mm' ? 3 : t.unit === 'bar' ? 2 : 1;
+    return '<div class="pv ' + cls + '" data-tag="' + t.tag + '"><div class="lip"></div>' +
+      '<div class="tag">' + t.tag + '</div>' +
+      '<div class="lbl">' + t.desc + '</div>' +
+      '<div class="val">' + t.pv.toFixed(dec) + '<small>' + t.unit + '</small></div>' +
+      '<div class="rng">SP ' + t.sp + ' · L ' + t.lo + ' / H ' + t.hi + '</div></div>';
+  }
+  function drawPvs() {
+    document.getElementById('pvs').innerHTML = Mock.TAGS.map(pvHtml).join('');
+  }
+  drawPvs();
+  Mock.onTick(drawPvs);
+  Mock.start(1500);
+
+  // ---- 알람 ----
+  var priC = { 1: 'var(--bad)', 2: 'var(--warn)', 3: 'var(--act)' };
+  document.getElementById('al-tb').innerHTML = AL.slice(0, 8).map(function (a) {
+    return '<tr class="' + (a.pri === 1 && !a.ack ? 'p1' : '') + (a.ack ? ' ack' : '') + '">' +
+      '<td style="width:30px;color:' + priC[a.pri] + ';font-family:var(--mono)">P' + a.pri + '</td>' +
+      '<td style="width:52px" class="dim">' + a.at + '</td>' +
+      '<td class="tag" style="width:92px">' + a.tag + '</td>' +
+      '<td style="white-space:normal">' + a.msg + '</td>' +
+      '<td style="width:44px">' + (a.ack ? '<span class="dim" style="font-size:10px">ACK</span>' : '') + '</td></tr>';
+  }).join('');
+
+  // ---- 카메라 4분할 ----
+  var picks = ['CAM-03', 'CAM-04', 'CAM-06', 'CAM-08'];
+  document.getElementById('cams').innerHTML = picks.map(function (id) {
+    var c = Mock.CAMS.filter(function (x) { return x.id === id; })[0];
+    return '<div class="camthumb"><div class="feed" id="f-' + id + '"></div>' +
+      '<div class="cap">' + c.id + ' · ' + c.name + '</div></div>';
+  }).join('');
+  picks.forEach(function (id) {
+    var c = Mock.CAMS.filter(function (x) { return x.id === id; })[0];
+    Cctv.attach(document.getElementById('f-' + id), c);
+  });
+
+  // ---- 유틸리티 ----
+  var UT = ['UTL_AIR701', 'UTL_CHW702', 'UTL_STM703', 'ENV_VOC801', 'ENV_O2802'];
+  function drawUtl() {
+    document.getElementById('utl-tb').innerHTML = UT.map(function (tg) {
+      var t = Mock.tag(tg), st = Mock.tagState(t);
+      var col = st === 'alarm' ? 'var(--bad)' : st === 'warn' ? 'var(--warn)' : 'var(--txt)';
+      return '<tr><td class="dim" style="width:102px">' + t.desc + '</td>' +
+        '<td class="num" style="color:' + col + '">' + t.pv.toFixed(t.unit === 'bar' ? 2 : 1) + '</td>' +
+        '<td class="dim" style="width:34px">' + t.unit + '</td></tr>';
+    }).join('');
+  }
+  drawUtl();
+  Mock.onTick(drawUtl);
+
+  var en = Mock.energy();
+  Chart.line(document.getElementById('ch-pw'), {
+    labels: en.hours, h: 110, area: true,
+    series: [{ name: '전력', color: '#5f7d99', data: en.power }]
+  });
+})();
+</script>
+</body>
+</html>
