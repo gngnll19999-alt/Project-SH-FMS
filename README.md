@@ -128,3 +128,18 @@ CCTV 는 현재 합성 영상으로 화면 자리만 확보한 상태다.
 
 - [SH-MES](../sh-mes) — 제조실행시스템 (설비 가동상태 · 알람 공유)
 - [SH-ERP](../sh-erp) — 전사적자원관리 (에너지 사용량 송신)
+
+## 만든 사람
+
+| | |
+|---|---|
+| 이름 | **남성흠** |
+| 출생 | 1996년생 |
+| 경력 | 중소기업 데이터센터 **7년 8개월차** (2026년 9월 기준) |
+| GitHub | [gngnll19999-alt](https://github.com/gngnll19999-alt) |
+
+### 프로젝트SH 3부작
+
+- [Project-SH-MES](https://github.com/gngnll19999-alt/Project-SH-MES) — SH-MES 제조실행시스템
+- [Project-SH-ERP](https://github.com/gngnll19999-alt/Project-SH-ERP) — SH-ERP 전사적자원관리
+- [Project-SH-FMS](https://github.com/gngnll19999-alt/Project-SH-FMS) — SH-FMS 자동화공장 통합 모니터링 **(현재 저장소)**
